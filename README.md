@@ -52,18 +52,7 @@ El usuario podrá:
 - Editar actividades.
 - Eliminar actividades.
 
----
 
-## 👨‍💼 Administrador
-
-El administrador podrá:
-
-- Administrar usuarios.
-- Visualizar todas las actividades.
-- Eliminar actividades.
-- Eliminar usuarios.
-- Consultar estadísticas generales.
-- Supervisar el funcionamiento del sistema.
 
 ---
 
