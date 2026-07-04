@@ -1,0 +1,403 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:proyecto_gr4/core/theme/app_theme.dart';
+import 'package:proyecto_gr4/features/tracking/data/tracking_repository.dart';
+import 'package:proyecto_gr4/features/tracking/domain/activity_session.dart';
+import 'package:proyecto_gr4/features/tracking/presentation/controllers/tracking_controller.dart';
+import 'package:proyecto_gr4/features/tracking/presentation/controllers/tracking_state.dart';
+import 'package:intl/intl.dart';
+import 'tracking_screen.dart';
+
+class HomeScreen extends ConsumerWidget {
+  const HomeScreen({super.key});
+
+  // Helper to format Duration to readable text
+  String _formatDuration(Duration duration) {
+    final minutes = duration.inMinutes.remainder(60);
+    final seconds = duration.inSeconds.remainder(60);
+    final hours = duration.inHours;
+    if (hours > 0) {
+      return '${hours}h ${minutes}m';
+    }
+    return '${minutes}m ${seconds}s';
+  }
+
+  // Helper to resolve icon and color based on title text
+  IconData _resolveIcon(String title) {
+    final t = title.toLowerCase();
+    if (t.contains('carrera') || t.contains('correr') || t.contains('running')) {
+      return Icons.directions_run;
+    } else if (t.contains('ciclismo') || t.contains('bici') || t.contains('ruta') || t.contains('cycling')) {
+      return Icons.directions_bike;
+    } else if (t.contains('caminata') || t.contains('camino') || t.contains('trote') || t.contains('walk')) {
+      return Icons.directions_walk;
+    }
+    return Icons.fitness_center;
+  }
+
+  Color _resolveColor(String title) {
+    final t = title.toLowerCase();
+    if (t.contains('carrera') || t.contains('correr') || t.contains('running')) {
+      return const Color(0xFF00F5D4); // Cyan/Teal
+    } else if (t.contains('ciclismo') || t.contains('bici') || t.contains('ruta') || t.contains('cycling')) {
+      return const Color(0xFF7B2CBF); // Purple
+    } else if (t.contains('caminata') || t.contains('camino') || t.contains('trote') || t.contains('walk')) {
+      return const Color(0xFFFF9F1C); // Orange
+    }
+    return AppTheme.primaryColor;
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final activities = ref.watch(completedActivitiesProvider);
+    final theme = Theme.of(context);
+
+    // If an error occurred during tracking init, show a Snackbar
+    ref.listen<TrackingState>(trackingProvider, (previous, next) {
+      if (next.errorMessage != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(next.errorMessage!),
+            backgroundColor: theme.colorScheme.error,
+            action: SnackBarAction(
+              label: 'OK',
+              textColor: Colors.white,
+              onPressed: () {
+                ref.read(trackingProvider.notifier).clearError();
+              },
+            ),
+          ),
+        );
+        ref.read(trackingProvider.notifier).clearError();
+      }
+    });
+
+    return Scaffold(
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Header Card with Profile & App Title
+              _buildHeader(context),
+              
+              const SizedBox(height: 56),
+
+              // Big "Iniciar actividad" button with circular progress / indicator
+              _buildStartButton(context, ref),
+
+              const SizedBox(height: 56),
+
+              // Recent activities title
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                child: Text(
+                  'Actividades Recientes',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              // Dynamic list of recorded activities (Empty state if empty)
+              _buildRecentActivitiesList(context, activities),
+              
+              const SizedBox(height: 24),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: theme.brightness == Brightness.dark 
+              ? [AppTheme.darkBackground, const Color(0xFF131A30)]
+              : [AppTheme.primaryColor.withOpacity(0.1), Colors.white],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Hola, Corredor',
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  color: theme.colorScheme.onSurface.withOpacity(0.6),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'GPS Tracker Pro',
+                style: theme.textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: AppTheme.primaryColor,
+                ),
+              ),
+            ],
+          ),
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: AppTheme.primaryColor, width: 2),
+            ),
+            child: const CircleAvatar(
+              radius: 24,
+              backgroundColor: AppTheme.cardDarkBackground,
+              child: Icon(Icons.person, color: Colors.white, size: 28),
+            ),
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStartButton(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    
+    return Center(
+      child: InkWell(
+        onTap: () async {
+          // Pre-flight check: Verify if GPS is enabled
+          final repo = ref.read(trackingRepositoryProvider);
+          final gpsEnabled = await repo.isGPSEnabled();
+          
+          if (!gpsEnabled) {
+            // Show alert dialog if GPS is disabled
+            if (context.mounted) {
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text(
+                    'GPS Desactivado',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  content: const Text(
+                    'El GPS de tu dispositivo está apagado. Por favor, actívalo en los ajustes de tu sistema para iniciar el seguimiento del recorrido.',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('ENTENDIDO'),
+                    ),
+                  ],
+                ),
+              );
+            }
+            return;
+          }
+
+          // Show temporary "GPS Activo" alert snackbar
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('GPS Activo'),
+                duration: Duration(milliseconds: 1500),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
+
+          // Trigger activity start
+          await ref.read(trackingProvider.notifier).startActivity();
+          
+          // Navigate to tracking screen
+          if (context.mounted) {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (context) => const TrackingScreen()),
+            );
+          }
+        },
+        borderRadius: BorderRadius.circular(100),
+        child: Container(
+          width: 180,
+          height: 180,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: AppTheme.primaryGradient,
+            boxShadow: [
+              BoxShadow(
+                color: AppTheme.primaryColor.withOpacity(0.4),
+                blurRadius: 20,
+                spreadRadius: 5,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.play_arrow_rounded,
+                size: 64,
+                color: Colors.white,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'INICIAR',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.5,
+                ),
+              ),
+              Text(
+                'ACTIVIDAD',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: Colors.white.withOpacity(0.8),
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.0,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRecentActivitiesList(BuildContext context, List<ActivitySession> activities) {
+    final theme = Theme.of(context);
+
+    // Empty state representation
+    if (activities.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24.0),
+        child: Card(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 32.0, horizontal: 16.0),
+            child: Column(
+              children: [
+                Icon(
+                  Icons.history_toggle_off_rounded,
+                  size: 56,
+                  color: theme.colorScheme.onSurface.withOpacity(0.3),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Sin actividades registradas',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Las rutas que grabes y finalices aparecerán listadas aquí.',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurface.withOpacity(0.5),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Dynamic list
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24.0),
+      child: ListView.separated(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: activities.length,
+        separatorBuilder: (context, index) => const SizedBox(height: 12),
+        itemBuilder: (context, index) {
+          final session = activities[index];
+          final title = session.title;
+          final icon = _resolveIcon(title);
+          final color = _resolveColor(title);
+          final dateStr = DateFormat('dd MMM yyyy, hh:mm a', 'es').format(session.startTime);
+
+          return Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      icon,
+                      color: color,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          dateStr,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurface.withOpacity(0.5),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            _buildMiniStat(theme, 'Distancia', '${session.stats.distanceKm.toStringAsFixed(2)} km'),
+                            _buildMiniStat(theme, 'Duración', _formatDuration(session.stats.duration)),
+                            _buildMiniStat(theme, 'Vel. Promedio', '${session.stats.averageSpeedKmH.toStringAsFixed(1)} km/h'),
+                          ],
+                        )
+                      ],
+                    ),
+                  )
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildMiniStat(ThemeData theme, String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: theme.textTheme.bodySmall?.copyWith(
+            fontSize: 10,
+            color: theme.colorScheme.onSurface.withOpacity(0.4),
+          ),
+        ),
+        Text(
+          value,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+            fontSize: 13,
+          ),
+        ),
+      ],
+    );
+  }
+}
