@@ -7,6 +7,11 @@ import 'package:proyecto_gr4/features/tracking/presentation/controllers/tracking
 import 'package:proyecto_gr4/features/tracking/presentation/controllers/tracking_state.dart';
 import 'package:intl/intl.dart';
 import 'tracking_screen.dart';
+import 'settings_screen.dart';
+import 'package:proyecto_gr4/core/providers/settings_provider.dart';
+import 'package:proyecto_gr4/core/services/weather_service.dart';
+import 'package:proyecto_gr4/core/services/elevation_service.dart';
+import 'package:geolocator/geolocator.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -79,7 +84,7 @@ class HomeScreen extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // Header Card with Profile & App Title
-              _buildHeader(context),
+              _buildHeader(context, ref),
               
               const SizedBox(height: 56),
 
@@ -113,7 +118,7 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildHeader(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
@@ -129,39 +134,170 @@ class HomeScreen extends ConsumerWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Hola, Corredor',
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    color: theme.colorScheme.onSurface.withOpacity(0.6),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'GPS Tracker Pro',
+                  style: theme.textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: AppTheme.primaryColor,
+                  ),
+                ),
+                _buildWeatherAndElevationWidget(context, ref),
+              ],
+            ),
+          ),
+          Row(
             children: [
-              Text(
-                'Hola, Corredor',
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  color: theme.colorScheme.onSurface.withOpacity(0.6),
+              IconButton(
+                icon: const Icon(Icons.settings, color: AppTheme.primaryColor, size: 28),
+                tooltip: 'Configuración',
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (context) => const SettingsScreen()),
+                  );
+                },
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppTheme.primaryColor, width: 2),
+                ),
+                child: const CircleAvatar(
+                  radius: 24,
+                  backgroundColor: AppTheme.cardDarkBackground,
+                  child: Icon(Icons.person, color: Colors.white, size: 28),
                 ),
               ),
-              const SizedBox(height: 4),
+            ],
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWeatherAndElevationWidget(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(settingsProvider);
+    final theme = Theme.of(context);
+    
+    Future<Map<String, dynamic>> fetchData() async {
+      double lat = -0.2186;
+      double lng = -78.5085;
+      
+      if (!settings.useSimulation) {
+        try {
+          final permission = await Geolocator.checkPermission();
+          if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
+            final pos = await Geolocator.getCurrentPosition(
+              desiredAccuracy: LocationAccuracy.low,
+              timeLimit: const Duration(seconds: 3),
+            );
+            lat = pos.latitude;
+            lng = pos.longitude;
+          }
+        } catch (_) {
+          // Fallback to default coordinates on error/timeout
+        }
+      }
+      
+      final results = await Future.wait([
+        WeatherService().fetchWeather(lat, lng),
+        ElevationService().fetchElevation(lat, lng),
+      ]);
+      
+      return {
+        'weather': results[0] as WeatherData,
+        'elevation': results[1] as double,
+      };
+    }
+    
+    return FutureBuilder<Map<String, dynamic>>(
+      future: fetchData(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Padding(
+            padding: const EdgeInsets.only(top: 6.0),
+            child: Row(
+              children: [
+                const SizedBox(
+                  width: 10,
+                  height: 10,
+                  child: CircularProgressIndicator(strokeWidth: 1.2, color: AppTheme.primaryColor),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'Cargando clima y altitud...',
+                  style: theme.textTheme.bodySmall?.copyWith(fontSize: 10, color: theme.colorScheme.onSurface.withOpacity(0.5)),
+                ),
+              ],
+            ),
+          );
+        }
+        
+        if (snapshot.hasError || !snapshot.hasData) {
+          return const SizedBox.shrink();
+        }
+        
+        final weather = snapshot.data!['weather'] as WeatherData;
+        final elevation = snapshot.data!['elevation'] as double;
+        
+        IconData weatherIcon = Icons.wb_cloudy_outlined;
+        final code = weather.weatherCode;
+        if (code == 0) weatherIcon = Icons.wb_sunny;
+        else if (code >= 1 && code <= 3) weatherIcon = Icons.wb_cloudy_outlined;
+        else if (code == 45 || code == 48) weatherIcon = Icons.filter_drama;
+        else if (code >= 51 && code <= 55) weatherIcon = Icons.grain;
+        else if (code >= 61 && code <= 65) weatherIcon = Icons.beach_access;
+        else if (code >= 80 && code <= 82) weatherIcon = Icons.umbrella;
+        else if (code >= 95 && code <= 99) weatherIcon = Icons.thunderstorm;
+
+        final elevationStr = settings.useMetricUnits
+            ? '${elevation.toStringAsFixed(0)} msnm'
+            : '${(elevation * 3.28084).toStringAsFixed(0)} pies';
+
+        return Padding(
+          padding: const EdgeInsets.only(top: 6.0),
+          child: Row(
+            children: [
+              Icon(weatherIcon, size: 14, color: AppTheme.primaryColor),
+              const SizedBox(width: 4),
               Text(
-                'GPS Tracker Pro',
-                style: theme.textTheme.headlineMedium?.copyWith(
+                '${weather.temperature.toStringAsFixed(0)}°C',
+                style: theme.textTheme.bodySmall?.copyWith(
                   fontWeight: FontWeight.w800,
-                  color: AppTheme.primaryColor,
+                  fontSize: 11,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                '•',
+                style: TextStyle(color: theme.colorScheme.onSurface.withOpacity(0.3), fontSize: 11),
+              ),
+              const SizedBox(width: 6),
+              const Icon(Icons.filter_hdr, size: 14, color: AppTheme.primaryColor),
+              const SizedBox(width: 4),
+              Text(
+                elevationStr,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 11,
                 ),
               ),
             ],
           ),
-          Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: AppTheme.primaryColor, width: 2),
-            ),
-            child: const CircleAvatar(
-              radius: 24,
-              backgroundColor: AppTheme.cardDarkBackground,
-              child: Icon(Icons.person, color: Colors.white, size: 28),
-            ),
-          )
-        ],
-      ),
+        );
+      },
     );
   }
 
