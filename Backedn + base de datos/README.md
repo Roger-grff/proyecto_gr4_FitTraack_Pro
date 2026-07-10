@@ -14,7 +14,7 @@ Todas las URLs de esta guía ya están escritas completas con esta base, listas 
 ## Índice
 
 1. [Cómo funciona la autenticación (léelo primero)](#cómo-funciona-la-autenticación)
-2. [Auth — Registro, login y contraseña](#1-auth)
+2. [Auth — Registro, login ](#1-auth)
 3. [Users — Perfil del usuario](#2-users)
 4. [Activities — Actividades físicas (correr / caminar)](#3-activities)
 5. [Weather — Clima](#4-weather)
@@ -108,68 +108,7 @@ Valida email + contraseña y devuelve el token para usar en el resto de endpoint
 
 ---
 
-### 1.3 Fase 1 — Solicitar recuperación de contraseña
-El usuario está en la pantalla "¿Olvidaste tu contraseña?" e ingresa su correo. Si el correo existe en la base de datos, el backend genera un token temporal, lo asocia al usuario y envía un correo (vía Nodemailer) con el enlace de recuperación. **En esta fase todavía no se cambia la contraseña**, solo se confirma que el correo fue enviado.
 
-- **Método:** `POST`
-- **URL:** `https://fittraack-movil-gr4-v2-xpress.onrender.com/api/auth/recuperarpassword`
-- **Autenticación:** 🔓 Pública
-- **Body (JSON):**
-```json
-{
-  "email": "correo@epn.edu.ec"
-}
-```
-- **Respuesta (200 OK):**
-```json
-{ "msg": "Revisa tu correo institucional para restablecer tu contraseña" }
-```
-- **Errores comunes:** `400` si falta `email`. `404` si ese correo no está registrado.
-
----
-
-### 1.4 Fase 2 — Validar token de recuperación
-El usuario abre el enlace que le llegó al correo (contiene el token). El frontend valida ese token **antes** de mostrar el formulario de nueva contraseña. Si el token no existe, no pertenece a ningún usuario o ya expiró, el formulario de nueva contraseña **nunca debe mostrarse**.
-
-- **Método:** `GET`
-- **URL:** `https://fittraack-movil-gr4-v2-xpress.onrender.com/api/auth/recuperarpassword/{token}`
-  - Reemplaza `{token}` por el token recibido en el correo. Ejemplo: `.../api/auth/recuperarpassword/9f2a1b3c...`
-- **Autenticación:** 🔓 Pública
-- **Body:** no necesita
-- **Respuesta (200 OK):**
-```json
-{ "msg": "Token confirmado. Ya puedes crear tu nueva contraseña." }
-```
-- **Errores comunes:** `400` si el token es inválido o ya expiró (el enlace de recuperación dura 60 minutos).
-
----
-
-### 1.5 Fase 3 — Establecer nueva contraseña
-Con el token ya validado (Fase 2), el usuario llena el formulario con la nueva contraseña y su confirmación. El backend vuelve a revisar que el token siga siendo válido (pudo expirar mientras el usuario escribía), valida que ambas contraseñas coincidan y que cumplan las reglas de seguridad, encripta la contraseña, la guarda, y **invalida el token** para que no pueda reutilizarse.
-
-- **Método:** `POST`
-- **URL:** `https://fittraack-movil-gr4-v2-xpress.onrender.com/api/auth/nuevopassword/{token}`
-  - Reemplaza `{token}` por el mismo token de la Fase 2.
-- **Autenticación:** 🔓 Pública
-- **Body (JSON):**
-```json
-{
-  "password": "Ejemplo1@",
-  "confirmpassword": "Ejemplo1@"
-}
-```
-- **Reglas de la contraseña:** mínimo 8 caracteres, con al menos 1 mayúscula, 1 minúscula, 1 número y 1 carácter especial (ej. `Ejemplo1@`).
-- **Respuesta (200 OK):**
-```json
-{ "msg": "¡Contraseña actualizada! Ya puedes iniciar sesión." }
-```
-- **Errores comunes:**
-  - `400` si falta `password` o `confirmpassword`
-  - `400` si las contraseñas no coinciden
-  - `400` si la contraseña no cumple las reglas de seguridad
-  - `400` si el token es inválido o ya expiró
-
-Después de este paso, el usuario ya puede iniciar sesión con la nueva contraseña usando `POST /api/auth/login` (endpoint 1.2).
 
 ---
 
