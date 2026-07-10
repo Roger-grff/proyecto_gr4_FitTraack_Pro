@@ -14,7 +14,7 @@ Todas las URLs de esta guía ya están escritas completas con esta base, listas 
 ## Índice
 
 1. [Cómo funciona la autenticación (léelo primero)](#cómo-funciona-la-autenticación)
-2. [Auth — Registro, login ](#1-auth)
+2. [Auth — Registro y login](#1-auth)
 3. [Users — Perfil del usuario](#2-users)
 4. [Activities — Actividades físicas (correr / caminar)](#3-activities)
 5. [Weather — Clima](#4-weather)
@@ -51,7 +51,7 @@ El token expira a los **7 días**. Después de eso hay que volver a hacer login.
 ---
 
 ## 1. Auth
-Rutas base: `/api/auth`. Sirven para crear cuentas, iniciar sesión y recuperar contraseña.
+Rutas base: `/api/auth`. Sirven para crear cuentas e iniciar sesión.
 
 ### 1.1 Registrar usuario
 Crea una cuenta nueva. Es el primer paso para poder usar la app: guarda el email, la contraseña (encriptada) y el nombre, y de una vez devuelve el token para que el usuario quede logueado automáticamente tras registrarse.
@@ -108,85 +108,7 @@ Valida email + contraseña y devuelve el token para usar en el resto de endpoint
 
 ---
 
-
-
----
-
-### 1.6 Diagrama de flujo — Recuperación de contraseña
-
-```
- USUARIO                FRONTEND                    BACKEND                  CORREO
-    |                       |                           |                        |
-    |  Ingresa email        |                           |                        |
-    |----------------------->                           |                        |
-    |                       |  POST /api/auth/           |                        |
-    |                       |  recuperarpassword         |                        |
-    |                       |  { email }                 |                        |
-    |                       |--------------------------->|                        |
-    |                       |                           | Valida que el email    |
-    |                       |                           | exista en la BD        |
-    |                       |                           | Genera token temporal  |
-    |                       |                           | Guarda hash del token  |
-    |                       |                           | asociado al usuario    |
-    |                       |                           |----------------------->|
-    |                       |                           |  Envía correo con      |
-    |                       |                           |  enlace + token        |
-    |                       |                           |                        |
-    |                       |  200 { msg: "Revisa tu    |                        |
-    |                       |  correo institucional..." }|                        |
-    |                       |<---------------------------|                        |
-    |  Ve confirmación      |                           |                        |
-    |<-----------------------|                           |                        |
-    |                       |                           |                        |
-    |  Abre el correo       |                           |                        |
-    |<--------------------------------------------------------------------------|
-    |  Da clic en el enlace |                           |                        |
-    |----------------------->                           |                        |
-    |                       |  GET /api/auth/            |                        |
-    |                       |  recuperarpassword/{token} |                        |
-    |                       |--------------------------->|                        |
-    |                       |                           | Verifica que el token  |
-    |                       |                           | exista, sea de un      |
-    |                       |                           | usuario y no expiró    |
-    |                       |  200 { msg: "Token         |                        |
-    |                       |  confirmado..." }          |                        |
-    |                       |<---------------------------|                        |
-    |  Ve formulario de     |                           |                        |
-    |  nueva contraseña     |                           |                        |
-    |<-----------------------|                           |                        |
-    |                       |                           |                        |
-    |  Escribe nueva         |                           |                        |
-    |  contraseña + confirma |                           |                        |
-    |----------------------->                           |                        |
-    |                       |  POST /api/auth/           |                        |
-    |                       |  nuevopassword/{token}     |                        |
-    |                       |  { password,               |                        |
-    |                       |    confirmpassword }       |                        |
-    |                       |--------------------------->|                        |
-    |                       |                           | Revalida el token      |
-    |                       |                           | Valida coincidencia    |
-    |                       |                           | Valida reglas de       |
-    |                       |                           | seguridad              |
-    |                       |                           | Encripta contraseña    |
-    |                       |                           | Actualiza usuario      |
-    |                       |                           | Invalida el token      |
-    |                       |                           |----------------------->|
-    |                       |                           |  (opcional) Notifica   |
-    |                       |                           |  cambio de contraseña  |
-    |                       |  200 { msg: "¡Contraseña   |                        |
-    |                       |  actualizada!..." }        |                        |
-    |                       |<---------------------------|                        |
-    |  Ve mensaje de éxito  |                           |                        |
-    |<-----------------------|                           |                        |
-    |                       |                           |                        |
-    |  Inicia sesión con    |                           |                        |
-    |  la nueva contraseña  |                           |                        |
-    |----------------------->  POST /api/auth/login ---->|                        |
-```
-
----
-
-### 1.7 Ver mi usuario (ruta de prueba de login)
+### 1.3 Ver mi usuario (ruta de prueba de login)
 Endpoint simple para comprobar que el token funciona: devuelve los datos del usuario dueño del token. (Es prácticamente igual a `GET /api/users/me`, se usa para validar rápido la autenticación).
 
 - **Método:** `GET`
@@ -563,10 +485,7 @@ Mensaje simple de bienvenida, confirma que la API está corriendo.
 |---|---|---|---|---|
 | 1.1 | POST | `/api/auth/register` | 🔓 | Crear cuenta |
 | 1.2 | POST | `/api/auth/login` | 🔓 | Iniciar sesión |
-| 1.3 | POST | `/api/auth/recuperarpassword` | 🔓 | Fase 1: Solicitar recuperación (envía correo) |
-| 1.4 | GET | `/api/auth/recuperarpassword/{token}` | 🔓 | Fase 2: Validar token de recuperación |
-| 1.5 | POST | `/api/auth/nuevopassword/{token}` | 🔓 | Fase 3: Establecer nueva contraseña |
-| 1.7 | GET | `/api/auth/me` | 🔒 | Ver mi usuario (prueba de token) |
+| 1.3 | GET | `/api/auth/me` | 🔒 | Ver mi usuario (prueba de token) |
 | 2.1 | GET | `/api/users/me` | 🔒 | Ver mi perfil |
 | 2.2 | PATCH | `/api/users/me` | 🔒 | Editar mi perfil |
 | 2.3 | POST | `/api/users/me/photo` | 🔒 | Subir foto de perfil |
