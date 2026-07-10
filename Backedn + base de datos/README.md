@@ -108,49 +108,146 @@ Valida email + contraseña y devuelve el token para usar en el resto de endpoint
 
 ---
 
-### 1.3 Olvidé mi contraseña
-Inicia el flujo de recuperación: si el email existe, genera un token temporal (válido 60 minutos) y le envía un correo con el link para restablecer la contraseña.
+### 1.3 Fase 1 — Solicitar recuperación de contraseña
+El usuario está en la pantalla "¿Olvidaste tu contraseña?" e ingresa su correo. Si el correo existe en la base de datos, el backend genera un token temporal, lo asocia al usuario y envía un correo (vía Nodemailer) con el enlace de recuperación. **En esta fase todavía no se cambia la contraseña**, solo se confirma que el correo fue enviado.
 
 - **Método:** `POST`
-- **URL:** `https://fittraack-movil-gr4-v2-xpress.onrender.com/api/auth/forgot-password`
+- **URL:** `https://fittraack-movil-gr4-v2-xpress.onrender.com/api/auth/recuperarpassword`
 - **Autenticación:** 🔓 Pública
 - **Body (JSON):**
 ```json
 {
-  "email": "juan@example.com"
-}
-```
-- **Respuesta (200 OK):** siempre el mismo mensaje, exista o no el email (para no revelar qué correos están registrados):
-```json
-{
-  "msg": "Si el email está registrado, recibirás un enlace para restablecer tu contraseña."
-}
-```
-
----
-
-### 1.4 Restablecer contraseña
-Segundo paso del flujo anterior: con el token que llegó por correo, define una contraseña nueva.
-
-- **Método:** `POST`
-- **URL:** `https://fittraack-movil-gr4-v2-xpress.onrender.com/api/auth/reset-password`
-- **Autenticación:** 🔓 Pública
-- **Body (JSON):**
-```json
-{
-  "token": "el_token_que_llegó_por_correo",
-  "newPassword": "nuevaClave123"
+  "email": "correo@epn.edu.ec"
 }
 ```
 - **Respuesta (200 OK):**
 ```json
-{ "msg": "Contraseña actualizada correctamente. Ya puedes iniciar sesión." }
+{ "msg": "Revisa tu correo institucional para restablecer tu contraseña" }
 ```
-- **Errores comunes:** `400` si el token es inválido o ya expiró, o si `newPassword` tiene menos de 6 caracteres.
+- **Errores comunes:** `400` si falta `email`. `404` si ese correo no está registrado.
 
 ---
 
-### 1.5 Ver mi usuario (ruta de prueba de login)
+### 1.4 Fase 2 — Validar token de recuperación
+El usuario abre el enlace que le llegó al correo (contiene el token). El frontend valida ese token **antes** de mostrar el formulario de nueva contraseña. Si el token no existe, no pertenece a ningún usuario o ya expiró, el formulario de nueva contraseña **nunca debe mostrarse**.
+
+- **Método:** `GET`
+- **URL:** `https://fittraack-movil-gr4-v2-xpress.onrender.com/api/auth/recuperarpassword/{token}`
+  - Reemplaza `{token}` por el token recibido en el correo. Ejemplo: `.../api/auth/recuperarpassword/9f2a1b3c...`
+- **Autenticación:** 🔓 Pública
+- **Body:** no necesita
+- **Respuesta (200 OK):**
+```json
+{ "msg": "Token confirmado. Ya puedes crear tu nueva contraseña." }
+```
+- **Errores comunes:** `400` si el token es inválido o ya expiró (el enlace de recuperación dura 60 minutos).
+
+---
+
+### 1.5 Fase 3 — Establecer nueva contraseña
+Con el token ya validado (Fase 2), el usuario llena el formulario con la nueva contraseña y su confirmación. El backend vuelve a revisar que el token siga siendo válido (pudo expirar mientras el usuario escribía), valida que ambas contraseñas coincidan y que cumplan las reglas de seguridad, encripta la contraseña, la guarda, y **invalida el token** para que no pueda reutilizarse.
+
+- **Método:** `POST`
+- **URL:** `https://fittraack-movil-gr4-v2-xpress.onrender.com/api/auth/nuevopassword/{token}`
+  - Reemplaza `{token}` por el mismo token de la Fase 2.
+- **Autenticación:** 🔓 Pública
+- **Body (JSON):**
+```json
+{
+  "password": "Ejemplo1@",
+  "confirmpassword": "Ejemplo1@"
+}
+```
+- **Reglas de la contraseña:** mínimo 8 caracteres, con al menos 1 mayúscula, 1 minúscula, 1 número y 1 carácter especial (ej. `Ejemplo1@`).
+- **Respuesta (200 OK):**
+```json
+{ "msg": "¡Contraseña actualizada! Ya puedes iniciar sesión." }
+```
+- **Errores comunes:**
+  - `400` si falta `password` o `confirmpassword`
+  - `400` si las contraseñas no coinciden
+  - `400` si la contraseña no cumple las reglas de seguridad
+  - `400` si el token es inválido o ya expiró
+
+Después de este paso, el usuario ya puede iniciar sesión con la nueva contraseña usando `POST /api/auth/login` (endpoint 1.2).
+
+---
+
+### 1.6 Diagrama de flujo — Recuperación de contraseña
+
+```
+ USUARIO                FRONTEND                    BACKEND                  CORREO
+    |                       |                           |                        |
+    |  Ingresa email        |                           |                        |
+    |----------------------->                           |                        |
+    |                       |  POST /api/auth/           |                        |
+    |                       |  recuperarpassword         |                        |
+    |                       |  { email }                 |                        |
+    |                       |--------------------------->|                        |
+    |                       |                           | Valida que el email    |
+    |                       |                           | exista en la BD        |
+    |                       |                           | Genera token temporal  |
+    |                       |                           | Guarda hash del token  |
+    |                       |                           | asociado al usuario    |
+    |                       |                           |----------------------->|
+    |                       |                           |  Envía correo con      |
+    |                       |                           |  enlace + token        |
+    |                       |                           |                        |
+    |                       |  200 { msg: "Revisa tu    |                        |
+    |                       |  correo institucional..." }|                        |
+    |                       |<---------------------------|                        |
+    |  Ve confirmación      |                           |                        |
+    |<-----------------------|                           |                        |
+    |                       |                           |                        |
+    |  Abre el correo       |                           |                        |
+    |<--------------------------------------------------------------------------|
+    |  Da clic en el enlace |                           |                        |
+    |----------------------->                           |                        |
+    |                       |  GET /api/auth/            |                        |
+    |                       |  recuperarpassword/{token} |                        |
+    |                       |--------------------------->|                        |
+    |                       |                           | Verifica que el token  |
+    |                       |                           | exista, sea de un      |
+    |                       |                           | usuario y no expiró    |
+    |                       |  200 { msg: "Token         |                        |
+    |                       |  confirmado..." }          |                        |
+    |                       |<---------------------------|                        |
+    |  Ve formulario de     |                           |                        |
+    |  nueva contraseña     |                           |                        |
+    |<-----------------------|                           |                        |
+    |                       |                           |                        |
+    |  Escribe nueva         |                           |                        |
+    |  contraseña + confirma |                           |                        |
+    |----------------------->                           |                        |
+    |                       |  POST /api/auth/           |                        |
+    |                       |  nuevopassword/{token}     |                        |
+    |                       |  { password,               |                        |
+    |                       |    confirmpassword }       |                        |
+    |                       |--------------------------->|                        |
+    |                       |                           | Revalida el token      |
+    |                       |                           | Valida coincidencia    |
+    |                       |                           | Valida reglas de       |
+    |                       |                           | seguridad              |
+    |                       |                           | Encripta contraseña    |
+    |                       |                           | Actualiza usuario      |
+    |                       |                           | Invalida el token      |
+    |                       |                           |----------------------->|
+    |                       |                           |  (opcional) Notifica   |
+    |                       |                           |  cambio de contraseña  |
+    |                       |  200 { msg: "¡Contraseña   |                        |
+    |                       |  actualizada!..." }        |                        |
+    |                       |<---------------------------|                        |
+    |  Ve mensaje de éxito  |                           |                        |
+    |<-----------------------|                           |                        |
+    |                       |                           |                        |
+    |  Inicia sesión con    |                           |                        |
+    |  la nueva contraseña  |                           |                        |
+    |----------------------->  POST /api/auth/login ---->|                        |
+```
+
+---
+
+### 1.7 Ver mi usuario (ruta de prueba de login)
 Endpoint simple para comprobar que el token funciona: devuelve los datos del usuario dueño del token. (Es prácticamente igual a `GET /api/users/me`, se usa para validar rápido la autenticación).
 
 - **Método:** `GET`
@@ -527,9 +624,10 @@ Mensaje simple de bienvenida, confirma que la API está corriendo.
 |---|---|---|---|---|
 | 1.1 | POST | `/api/auth/register` | 🔓 | Crear cuenta |
 | 1.2 | POST | `/api/auth/login` | 🔓 | Iniciar sesión |
-| 1.3 | POST | `/api/auth/forgot-password` | 🔓 | Solicitar recuperación de contraseña |
-| 1.4 | POST | `/api/auth/reset-password` | 🔓 | Definir nueva contraseña con token |
-| 1.5 | GET | `/api/auth/me` | 🔒 | Ver mi usuario (prueba de token) |
+| 1.3 | POST | `/api/auth/recuperarpassword` | 🔓 | Fase 1: Solicitar recuperación (envía correo) |
+| 1.4 | GET | `/api/auth/recuperarpassword/{token}` | 🔓 | Fase 2: Validar token de recuperación |
+| 1.5 | POST | `/api/auth/nuevopassword/{token}` | 🔓 | Fase 3: Establecer nueva contraseña |
+| 1.7 | GET | `/api/auth/me` | 🔒 | Ver mi usuario (prueba de token) |
 | 2.1 | GET | `/api/users/me` | 🔒 | Ver mi perfil |
 | 2.2 | PATCH | `/api/users/me` | 🔒 | Editar mi perfil |
 | 2.3 | POST | `/api/users/me/photo` | 🔒 | Subir foto de perfil |
