@@ -5,6 +5,7 @@ import 'package:proyecto_gr4/features/auth/presentation/controllers/auth_provide
 import 'package:proyecto_gr4/features/auth/presentation/controllers/auth_state.dart';
 import 'package:proyecto_gr4/features/tracking/presentation/screens/home_screen.dart';
 import 'login_screen.dart';
+import 'package:proyecto_gr4/features/onboarding/presentation/screens/splash_screen.dart';
 
 /// Centralized auth navigation gate.
 ///
@@ -25,7 +26,7 @@ class AuthGate extends ConsumerWidget {
 
       case AuthStatus.unauthenticated:
       case AuthStatus.error:
-        return const LoginScreen();
+        return const SplashScreen();
 
       case AuthStatus.initial:
       case AuthStatus.loading:
