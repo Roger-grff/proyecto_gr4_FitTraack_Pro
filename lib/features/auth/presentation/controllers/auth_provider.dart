@@ -96,17 +96,14 @@ class AuthNotifier extends Notifier<AuthState> {
     }
   }
 
-  /// Reset password via email
-  Future<void> resetPassword(String email) async {
+  /// Reset password via email (Fase 1)
+  Future<void> requestPasswordRecovery(String email) async {
     state = state.copyWith(status: AuthStatus.loading, clearError: true);
 
     try {
-      await _repository.resetPassword(email);
-      // Restore previous auth status — password reset does not change session
+      await _repository.requestPasswordRecovery(email);
       state = state.copyWith(
-        status: state.user != null
-            ? AuthStatus.authenticated
-            : AuthStatus.unauthenticated,
+        status: AuthStatus.unauthenticated,
         clearError: true,
       );
     } catch (e) {
@@ -114,6 +111,42 @@ class AuthNotifier extends Notifier<AuthState> {
         status: AuthStatus.error,
         errorMessage: e.toString().replaceFirst('Exception: ', ''),
       );
+    }
+  }
+
+  /// Validate recovery token (Fase 2)
+  Future<void> validateRecoveryToken(String token) async {
+    state = state.copyWith(status: AuthStatus.loading, clearError: true);
+    try {
+      await _repository.validateRecoveryToken(token);
+      state = state.copyWith(
+        status: AuthStatus.unauthenticated,
+        clearError: true,
+      );
+    } catch (e) {
+      state = state.copyWith(
+        status: AuthStatus.error,
+        errorMessage: e.toString().replaceFirst('Exception: ', ''),
+      );
+      throw e; // Rethrow to let the UI know it failed
+    }
+  }
+
+  /// Set new password (Fase 3)
+  Future<void> setNewPassword(String token, String password, String confirmPassword) async {
+    state = state.copyWith(status: AuthStatus.loading, clearError: true);
+    try {
+      await _repository.setNewPassword(token, password, confirmPassword);
+      state = state.copyWith(
+        status: AuthStatus.unauthenticated,
+        clearError: true,
+      );
+    } catch (e) {
+      state = state.copyWith(
+        status: AuthStatus.error,
+        errorMessage: e.toString().replaceFirst('Exception: ', ''),
+      );
+      throw e;
     }
   }
 

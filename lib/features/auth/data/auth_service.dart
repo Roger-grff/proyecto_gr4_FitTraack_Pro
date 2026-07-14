@@ -94,4 +94,34 @@ class AuthService {
       throw Exception(errorData['message'] ?? 'Error al intentar recuperar la contraseña');
     }
   }
+
+  /// GET /api/auth/recuperarpassword/{token}
+  Future<void> validateRecoveryToken(String token) async {
+    final response = await http.get(
+      Uri.parse('${ApiConstants.recover}/$token'),
+      headers: {'Content-Type': 'application/json'},
+    );
+
+    if (response.statusCode != 200) {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Token inválido o expirado');
+    }
+  }
+
+  /// POST /api/auth/nuevopassword/{token}
+  Future<void> resetPassword(String token, String password, String confirmPassword) async {
+    final response = await http.post(
+      Uri.parse('${ApiConstants.newPassword}/$token'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'password': password,
+        'confirmpassword': confirmPassword,
+      }),
+    );
+
+    if (response.statusCode != 200) {
+      final errorData = jsonDecode(response.body);
+      throw Exception(errorData['message'] ?? 'Error al cambiar la contraseña');
+    }
+  }
 }

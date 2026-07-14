@@ -77,12 +77,30 @@ class AuthRepository {
     }
   }
 
-  /// Send password reset email via API.
-  Future<void> resetPassword(String email) async {
+  /// Send password reset email via API. (Fase 1)
+  Future<void> requestPasswordRecovery(String email) async {
     try {
       await _authService.recoverPassword(email);
     } catch (e) {
       throw Exception('Error al enviar correo de recuperación: $e');
+    }
+  }
+
+  /// Validate recovery token (Fase 2)
+  Future<void> validateRecoveryToken(String token) async {
+    try {
+      await _authService.validateRecoveryToken(token);
+    } catch (e) {
+      throw Exception('Token inválido o expirado: $e');
+    }
+  }
+
+  /// Set new password (Fase 3)
+  Future<void> setNewPassword(String token, String password, String confirmPassword) async {
+    try {
+      await _authService.resetPassword(token, password, confirmPassword);
+    } catch (e) {
+      throw Exception('Error al cambiar contraseña: $e');
     }
   }
 

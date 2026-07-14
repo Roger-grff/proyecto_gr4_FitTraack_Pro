@@ -5,4 +5,5 @@ class ApiConstants {
   static const register = "$baseUrl/api/auth/register";
   static const me = "$baseUrl/api/auth/me";
   static const recover = "$baseUrl/api/auth/recuperarpassword";
+  static const newPassword = "$baseUrl/api/auth/nuevopassword";
 }

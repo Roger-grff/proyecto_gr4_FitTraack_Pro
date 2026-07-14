@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:proyecto_gr4/core/theme/app_theme.dart';
 import 'package:proyecto_gr4/core/utils/validators.dart';
 import 'package:proyecto_gr4/core/utils/app_snackbar.dart';
@@ -8,64 +7,74 @@ import 'package:proyecto_gr4/core/widgets/primary_button.dart';
 import 'package:proyecto_gr4/core/widgets/app_text_field.dart';
 import 'package:proyecto_gr4/features/auth/presentation/controllers/auth_provider.dart';
 import 'package:proyecto_gr4/features/auth/presentation/controllers/auth_state.dart';
-import 'package:proyecto_gr4/features/auth/presentation/screens/forgot_password_screen.dart';
-import 'package:proyecto_gr4/features/auth/presentation/screens/register_screen.dart';
+import 'package:proyecto_gr4/features/tracking/presentation/screens/home_screen.dart';
 
-class LoginScreen extends ConsumerStatefulWidget {
-  const LoginScreen({super.key});
+class RegisterScreen extends ConsumerStatefulWidget {
+  const RegisterScreen({super.key});
 
   @override
-  ConsumerState<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen> {
+class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
+  
+  final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  
+  final _nameFocus = FocusNode();
   final _emailFocus = FocusNode();
   final _passwordFocus = FocusNode();
+  final _confirmPasswordFocus = FocusNode();
 
   bool _obscurePassword = true;
-  bool _rememberMe = false;
-  static const _rememberMeKey = 'remember_me';
-
-  @override
-  void initState() {
-    super.initState();
-    _loadRememberMe();
-  }
-
-  Future<void> _loadRememberMe() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _rememberMe = prefs.getBool(_rememberMeKey) ?? false;
-    });
-  }
-
-  Future<void> _saveRememberMe(bool value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_rememberMeKey, value);
-  }
+  bool _obscureConfirmPassword = true;
 
   @override
   void dispose() {
+    _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    _nameFocus.dispose();
     _emailFocus.dispose();
     _passwordFocus.dispose();
+    _confirmPasswordFocus.dispose();
     super.dispose();
   }
 
-  void _submitForm() {
-    // Hide keyboard
+  void _submitForm() async {
     FocusScope.of(context).unfocus();
 
     if (_formKey.currentState!.validate()) {
-      _saveRememberMe(_rememberMe);
-      ref.read(authProvider.notifier).signIn(
+      if (_passwordController.text != _confirmPasswordController.text) {
+        AppSnackBar.showError(context, 'Las contraseñas no coinciden');
+        return;
+      }
+
+      await ref.read(authProvider.notifier).signUp(
             _emailController.text.trim(),
             _passwordController.text,
+            _nameController.text.trim(),
           );
+      
+      // We check state directly because AuthGate will rebuild and navigate to Home automatically
+      // when AuthStatus becomes authenticated. However, RegisterScreen is pushed on top of AuthGate.
+      // We should pop it if authenticated, so AuthGate's HomeScreen becomes visible, or pushReplacement.
+      
+      final state = ref.read(authProvider);
+      if (state.status == AuthStatus.authenticated) {
+        if (mounted) {
+          AppSnackBar.showSuccess(context, '¡Cuenta creada con éxito!');
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (_) => const HomeScreen()),
+            (route) => false,
+          );
+        }
+      }
     }
   }
 
@@ -84,6 +93,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     });
 
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('Crear cuenta'),
+      ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -96,7 +108,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 children: [
                   // Logo
                   Icon(
-                    Icons.fitness_center_rounded,
+                    Icons.person_add_alt_1_rounded,
                     size: 80,
                     color: AppTheme.primaryColor,
                   ),
@@ -104,7 +116,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   
                   // Header
                   Text(
-                    '¡Bienvenido de nuevo!',
+                    '¡Únete a FitTrack Pro!',
                     style: theme.textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -112,13 +124,32 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Inicia sesión para continuar con tu progreso.',
+                    'Crea una cuenta para registrar tu progreso.',
                     style: theme.textTheme.bodyLarge?.copyWith(
                       color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
                     ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 48),
+
+                  // Name Field
+                  AppTextField(
+                    label: 'Nombre completo',
+                    hint: 'Ej. Juan Pérez',
+                    prefixIcon: Icons.person_outline,
+                    controller: _nameController,
+                    focusNode: _nameFocus,
+                    nextFocusNode: _emailFocus,
+                    keyboardType: TextInputType.name,
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'El nombre es obligatorio';
+                      }
+                      return null;
+                    },
+                    enabled: !isLoading,
+                  ),
+                  const SizedBox(height: 20),
 
                   // Email Field
                   AppTextField(
@@ -141,8 +172,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     prefixIcon: Icons.lock_outline_rounded,
                     controller: _passwordController,
                     focusNode: _passwordFocus,
+                    nextFocusNode: _confirmPasswordFocus,
                     obscureText: _obscurePassword,
-                    textInputAction: TextInputAction.done,
                     validator: Validators.validatePassword,
                     enabled: !isLoading,
                     suffixIcon: IconButton(
@@ -156,83 +187,60 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       },
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 20),
 
-                  // Options row
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          Checkbox(
-                            value: _rememberMe,
-                            onChanged: isLoading
-                                ? null
-                                : (value) {
-                                    setState(() {
-                                      _rememberMe = value ?? false;
-                                    });
-                                  },
-                            activeColor: AppTheme.primaryColor,
-                          ),
-                          Text(
-                            'Recordarme',
-                            style: theme.textTheme.bodyMedium,
-                          ),
-                        ],
+                  // Confirm Password Field
+                  AppTextField(
+                    label: 'Confirmar contraseña',
+                    hint: 'Mínimo 6 caracteres',
+                    prefixIcon: Icons.lock_reset_rounded,
+                    controller: _confirmPasswordController,
+                    focusNode: _confirmPasswordFocus,
+                    obscureText: _obscureConfirmPassword,
+                    textInputAction: TextInputAction.done,
+                    validator: (val) {
+                      if (val == null || val.isEmpty) {
+                        return 'Confirma tu contraseña';
+                      }
+                      if (val != _passwordController.text) {
+                        return 'Las contraseñas no coinciden';
+                      }
+                      return null;
+                    },
+                    enabled: !isLoading,
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscureConfirmPassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
                       ),
-                      TextButton(
-                        onPressed: isLoading
-                            ? null
-                            : () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const ForgotPasswordScreen(),
-                                  ),
-                                );
-                              },
-                        child: Text(
-                          '¿Olvidaste tu contraseña?',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: AppTheme.primaryColor,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
+                      onPressed: () {
+                        setState(() {
+                          _obscureConfirmPassword = !_obscureConfirmPassword;
+                        });
+                      },
+                    ),
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 48),
 
-                  // Login Button
+                  // Register Button
                   PrimaryButton(
-                    text: 'Iniciar sesión',
+                    text: 'Crear cuenta',
                     onPressed: _submitForm,
                     isLoading: isLoading,
                   ),
                   const SizedBox(height: 24),
 
-                  // Register link
+                  // Login link
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        '¿No tienes una cuenta?',
+                        '¿Ya tienes una cuenta?',
                         style: theme.textTheme.bodyMedium,
                       ),
                       TextButton(
-                        onPressed: isLoading
-                            ? null
-                            : () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const RegisterScreen(),
-                                  ),
-                                );
-                              },
+                        onPressed: isLoading ? null : () => Navigator.pop(context),
                         child: Text(
-                          'Crear cuenta',
+                          'Iniciar sesión',
                           style: theme.textTheme.bodyLarge?.copyWith(
                             color: AppTheme.primaryColor,
                             fontWeight: FontWeight.bold,
