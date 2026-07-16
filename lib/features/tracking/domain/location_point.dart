@@ -18,6 +18,17 @@ class LocationPoint {
   // Calculate speed in km/h
   double get speedKmH => speed * 3.6;
 
+  Map<String, dynamic> toBackendMap() {
+    return {
+      "lat": latitude,
+      "lng": longitude,
+      "altitude": altitude,
+      "speed": speed,
+      "accuracy": accuracy,
+      "timestamp": timestamp.toIso8601String(),
+    };
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'latitude': latitude,

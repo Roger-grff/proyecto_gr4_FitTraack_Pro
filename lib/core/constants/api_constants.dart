@@ -6,4 +6,8 @@ class ApiConstants {
   static const me = "$baseUrl/api/auth/me";
   static const recover = "$baseUrl/api/auth/recuperarpassword";
   static const newPassword = "$baseUrl/api/auth/nuevopassword";
+
+  static const activities = "$baseUrl/api/activities";
+  static const usersMe = "$baseUrl/api/users/me";
+  static const statsMe = "$baseUrl/api/stats/me";
 }
