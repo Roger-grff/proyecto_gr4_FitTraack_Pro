@@ -4,17 +4,32 @@ import 'package:proyecto_gr4/core/errors/tracking_error.dart';
 import 'package:proyecto_gr4/features/tracking/data/tracking_repository.dart';
 import 'package:proyecto_gr4/features/tracking/domain/activity_session.dart';
 import 'package:proyecto_gr4/features/tracking/domain/location_point.dart';
+import 'package:proyecto_gr4/features/tracking/data/activity_service.dart';
+import 'package:proyecto_gr4/features/tracking/data/activity_service_provider.dart';
+import 'package:proyecto_gr4/features/tracking/domain/finish_activity_result.dart';
+import 'package:proyecto_gr4/core/errors/api_exception.dart';
 import 'timer_controller.dart';
 import 'tracking_state.dart';
+
+class _PendingActivitySave {
+  final ActivitySession session;
+  final String type;
+  final String description;
+  final Map<String, dynamic>? weather;
+  _PendingActivitySave({required this.session, required this.type, required this.description, this.weather});
+}
 
 class TrackingNotifier extends Notifier<TrackingState> {
   StreamSubscription<LocationPoint>? _locationSubscription;
   DateTime? _sessionStartTime;
+  _PendingActivitySave? _pendingSave;
 
   TrackingRepository get _repository => ref.read(trackingRepositoryProvider);
+  late ActivityService _activityService;
 
   @override
   TrackingState build() {
+    _activityService = ref.watch(activityServiceProvider);
     // Listen to timer ticks to update active duration and average speed
     ref.listen<Duration>(timerProvider, (previous, next) {
       if (state.status == TrackingStatus.tracking) {
@@ -90,30 +105,106 @@ class TrackingNotifier extends Notifier<TrackingState> {
     }
   }
 
-  /// Finish current activity and generate session recap
-  void finishActivity(String title) {
-    if (state.status != TrackingStatus.tracking && state.status != TrackingStatus.paused) return;
+  /// Build new session without resetting timer/gps if already stopped
+  ActivitySession _buildSession(String title) {
+    return ActivitySession(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      title: title,
+      startTime: _sessionStartTime ?? DateTime.now().subtract(state.stats.duration),
+      endTime: DateTime.now(),
+      routePoints: List.from(state.routePoints),
+      stats: state.stats,
+    );
+  }
+
+  Future<FinishActivityResult> finishAndSaveActivity({
+    required String title,
+    required String type,
+    String description = '',
+    Map<String, dynamic>? weather,
+  }) async {
+    if (state.status != TrackingStatus.tracking && state.status != TrackingStatus.paused) {
+      throw StateError('No hay actividad en curso o pausada para finalizar.');
+    }
+    if (state.isSavingActivity) {
+      throw StateError('El guardado ya está en curso.');
+    }
+
+    String normalizedTitle = title.trim();
+    if (normalizedTitle.isEmpty) normalizedTitle = 'Actividad deportiva';
+    
+    if (type != 'running' && type != 'walking') {
+      throw ArgumentError('El tipo de actividad solo puede ser "running" o "walking"');
+    }
 
     _unsubscribeFromLocation();
     ref.read(timerProvider.notifier).pause();
 
-    final endTime = DateTime.now();
-    final session = ActivitySession(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      title: title,
-      startTime: _sessionStartTime ?? DateTime.now().subtract(state.stats.duration),
-      endTime: endTime,
-      routePoints: List.from(state.routePoints),
-      stats: state.stats,
+    // Construct local session
+    final session = _buildSession(normalizedTitle);
+
+    // Keep pending session for retry mechanism
+    _pendingSave = _PendingActivitySave(
+      session: session,
+      type: type,
+      description: description,
+      weather: weather,
     );
 
-    // Save the activity in the completed list
-    ref.read(completedActivitiesProvider.notifier).addActivity(session);
+    return _executeSave(_pendingSave!);
+  }
 
-    state = state.copyWith(
-      status: TrackingStatus.finished,
-      finishedSession: session,
-    );
+  Future<FinishActivityResult> retryPendingActivitySave() async {
+    if (_pendingSave == null) {
+      throw StateError('No hay ninguna actividad pendiente de guardar.');
+    }
+    if (state.isSavingActivity) {
+      throw StateError('El guardado ya está en curso.');
+    }
+
+    return _executeSave(_pendingSave!);
+  }
+
+  Future<FinishActivityResult> _executeSave(_PendingActivitySave pending) async {
+    state = state.copyWith(isSavingActivity: true, clearSaveError: true);
+
+    try {
+      final backendResult = await _activityService.createActivity(
+        session: pending.session,
+        type: pending.type,
+        description: pending.description,
+        weather: pending.weather,
+      );
+
+      // Si tiene exito, agregar a lista local
+      ref.read(completedActivitiesProvider.notifier).addActivity(pending.session);
+
+      state = state.copyWith(
+        status: TrackingStatus.finished,
+        finishedSession: pending.session,
+        isSavingActivity: false,
+      );
+
+      _pendingSave = null; // Clear on success
+
+      return FinishActivityResult(
+        localSession: pending.session,
+        backendResult: backendResult,
+      );
+    } catch (e) {
+      String msg = 'No se pudo guardar la actividad.';
+      if (e is ApiException) {
+        msg = e.message;
+      }
+      
+      state = state.copyWith(
+        isSavingActivity: false,
+        saveActivityError: msg,
+      );
+      
+      // Lanzamos la excepción para que la interfaz reaccione (ej. cerrando loaders si es que tiene await).
+      rethrow;
+    }
   }
 
   /// Reset tracking controller back to idle
