@@ -173,12 +173,21 @@ class ProfileScreen extends ConsumerWidget {
                       padding: const EdgeInsets.only(bottom: 10),
                       child: BackendActivityCard(
                         activity: activity,
-                        onTap: () {
-                          Navigator.of(context).push(
+                        onTap: () async {
+                          final deleted = await Navigator.of(context).push<bool>(
                             MaterialPageRoute(
                               builder: (_) => ActivityDetailScreen(activityId: activity.id),
                             ),
                           );
+
+                          if (!context.mounted) return;
+                          if (deleted == true) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Actividad eliminada correctamente.'),
+                              ),
+                            );
+                          }
                         },
                       ),
                     )).toList(),

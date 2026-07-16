@@ -8,10 +8,21 @@ import 'package:proyecto_gr4/features/tracking/data/models/activity_detail_resul
 import 'package:proyecto_gr4/features/tracking/data/models/backend_track_point.dart';
 import 'package:proyecto_gr4/features/tracking/presentation/controllers/activity_detail_controller.dart';
 
-class ActivityDetailScreen extends ConsumerWidget {
+import 'package:proyecto_gr4/features/tracking/data/activity_service_provider.dart';
+import 'package:proyecto_gr4/features/tracking/presentation/controllers/activities_controller.dart';
+import 'package:proyecto_gr4/core/errors/api_exception.dart';
+
+class ActivityDetailScreen extends ConsumerStatefulWidget {
   final String activityId;
 
   const ActivityDetailScreen({super.key, required this.activityId});
+
+  @override
+  ConsumerState<ActivityDetailScreen> createState() => _ActivityDetailScreenState();
+}
+
+class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
+  bool _isDeleting = false;
 
   String _formatDuration(int seconds) {
     final duration = Duration(seconds: seconds);
@@ -31,31 +42,112 @@ class ActivityDetailScreen extends ConsumerWidget {
     return type;
   }
 
+  Future<void> _deleteActivity() async {
+    if (_isDeleting) return;
+
+    setState(() => _isDeleting = true);
+
+    try {
+      await ref.read(activityServiceProvider).deleteActivity(widget.activityId);
+      
+      ref.invalidate(activitiesProvider);
+      ref.invalidate(activityDetailProvider(widget.activityId));
+      
+      if (!mounted) return;
+      Navigator.pop(context, true);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      
+      String msg = 'No se pudo eliminar la actividad.';
+      if (e.statusCode == 401) {
+        msg = 'Tu sesión expiró. Vuelve a iniciar sesión.';
+      } else if (e.statusCode == 403) {
+        msg = 'No tienes permiso para eliminar esta actividad.';
+      } else if (e.statusCode == 404) {
+        msg = 'La actividad ya no existe.';
+        ref.invalidate(activitiesProvider); // Invalidar localmente para que no aparezca
+      } else if (e.statusCode == 500) {
+        msg = 'No se pudo eliminar la actividad en este momento.';
+      }
+      
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      setState(() => _isDeleting = false);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudo eliminar la actividad. Revisa tu conexión.')),
+      );
+      setState(() => _isDeleting = false);
+    }
+  }
+
+  Future<void> _showDeleteConfirmation() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      barrierDismissible: !_isDeleting,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('¿Eliminar actividad?'),
+          content: const Text('Esta acción eliminará permanentemente la actividad y su recorrido. No se puede deshacer.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: TextButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.error),
+              child: const Text('Eliminar'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm == true && mounted) {
+      _deleteActivity();
+    }
+  }
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final detailAsync = ref.watch(activityDetailProvider(activityId));
+  Widget build(BuildContext context) {
+    final detailAsync = ref.watch(activityDetailProvider(widget.activityId));
     final theme = Theme.of(context);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Detalle de Actividad'),
-      ),
-      body: detailAsync.when(
-        data: (result) => _buildDetail(context, result, theme, ref),
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stack) => Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text('Error al cargar detalle', style: TextStyle(color: theme.colorScheme.error)),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () => ref.invalidate(activityDetailProvider(activityId)),
-                child: const Text('Reintentar'),
-              ),
-            ],
-          ),
+    return PopScope(
+      canPop: !_isDeleting,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Detalle de Actividad'),
         ),
+        body: _isDeleting
+            ? const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 16),
+                    Text('Eliminando actividad...'),
+                  ],
+                ),
+              )
+            : detailAsync.when(
+                data: (result) => _buildDetail(context, result, theme, ref),
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (error, stack) => Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text('Error al cargar detalle', style: TextStyle(color: theme.colorScheme.error)),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: () => ref.invalidate(activityDetailProvider(widget.activityId)),
+                        child: const Text('Reintentar'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
       ),
     );
   }
@@ -172,6 +264,21 @@ class ActivityDetailScreen extends ConsumerWidget {
                     ]
                   ],
                 ),
+              ),
+            ),
+          ),
+
+          // Delete button
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+            child: OutlinedButton.icon(
+              onPressed: _isDeleting ? null : _showDeleteConfirmation,
+              icon: const Icon(Icons.delete_outline),
+              label: const Text('Eliminar actividad'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: theme.colorScheme.error,
+                side: BorderSide(color: theme.colorScheme.error.withOpacity(0.5)),
+                padding: const EdgeInsets.symmetric(vertical: 16),
               ),
             ),
           ),

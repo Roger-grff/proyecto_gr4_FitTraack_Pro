@@ -5,8 +5,9 @@ import 'package:proyecto_gr4/features/tracking/data/models/backend_activity.dart
 
 class BackendActivityCard extends StatelessWidget {
   final BackendActivity activity;
+  final VoidCallback? onTap;
 
-  const BackendActivityCard({super.key, required this.activity});
+  const BackendActivityCard({super.key, required this.activity, this.onTap});
 
   String _formatDuration(int totalSeconds) {
     final duration = Duration(seconds: totalSeconds);

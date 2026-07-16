@@ -491,12 +491,21 @@ class HomeScreen extends ConsumerWidget {
             itemBuilder: (context, index) {
               return BackendActivityCard(
                 activity: activities[index],
-                onTap: () {
-                  Navigator.of(context).push(
+                onTap: () async {
+                  final deleted = await Navigator.of(context).push<bool>(
                     MaterialPageRoute(
                       builder: (_) => ActivityDetailScreen(activityId: activities[index].id),
                     ),
                   );
+
+                  if (!context.mounted) return;
+                  if (deleted == true) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Actividad eliminada correctamente.'),
+                      ),
+                    );
+                  }
                 },
               );
             },
