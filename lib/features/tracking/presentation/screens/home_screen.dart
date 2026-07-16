@@ -6,6 +6,9 @@ import 'package:proyecto_gr4/features/tracking/domain/activity_session.dart';
 import 'package:proyecto_gr4/features/tracking/presentation/controllers/tracking_controller.dart';
 import 'package:proyecto_gr4/features/tracking/presentation/controllers/tracking_state.dart';
 import 'package:intl/intl.dart';
+import 'package:proyecto_gr4/features/tracking/presentation/controllers/activities_controller.dart';
+import 'package:proyecto_gr4/features/tracking/presentation/widgets/backend_activity_card.dart';
+import 'package:proyecto_gr4/features/tracking/data/models/backend_activity.dart';
 import 'tracking_screen.dart';
 import 'settings_screen.dart';
 import 'profile_screen.dart';
@@ -17,45 +20,9 @@ import 'package:geolocator/geolocator.dart';
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
-  // Helper to format Duration to readable text
-  String _formatDuration(Duration duration) {
-    final minutes = duration.inMinutes.remainder(60);
-    final seconds = duration.inSeconds.remainder(60);
-    final hours = duration.inHours;
-    if (hours > 0) {
-      return '${hours}h ${minutes}m';
-    }
-    return '${minutes}m ${seconds}s';
-  }
-
-  // Helper to resolve icon and color based on title text
-  IconData _resolveIcon(String title) {
-    final t = title.toLowerCase();
-    if (t.contains('carrera') || t.contains('correr') || t.contains('running')) {
-      return Icons.directions_run;
-    } else if (t.contains('ciclismo') || t.contains('bici') || t.contains('ruta') || t.contains('cycling')) {
-      return Icons.directions_bike;
-    } else if (t.contains('caminata') || t.contains('camino') || t.contains('trote') || t.contains('walk')) {
-      return Icons.directions_walk;
-    }
-    return Icons.fitness_center;
-  }
-
-  Color _resolveColor(String title) {
-    final t = title.toLowerCase();
-    if (t.contains('carrera') || t.contains('correr') || t.contains('running')) {
-      return const Color(0xFF00F5D4); // Cyan/Teal
-    } else if (t.contains('ciclismo') || t.contains('bici') || t.contains('ruta') || t.contains('cycling')) {
-      return const Color(0xFF7B2CBF); // Purple
-    } else if (t.contains('caminata') || t.contains('camino') || t.contains('trote') || t.contains('walk')) {
-      return const Color(0xFFFF9F1C); // Orange
-    }
-    return AppTheme.primaryColor;
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final activities = ref.watch(completedActivitiesProvider);
+    final activitiesAsync = ref.watch(activitiesProvider);
     final theme = Theme.of(context);
 
     // If an error occurred during tracking init, show a Snackbar
@@ -79,40 +46,57 @@ class HomeScreen extends ConsumerWidget {
     });
 
     return Scaffold(
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Header Card with Profile & App Title
-              _buildHeader(context, ref),
-              
-              const SizedBox(height: 56),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await ref.read(activitiesProvider.notifier).refreshActivities();
+        },
+        child: SafeArea(
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Header Card with Profile & App Title
+                _buildHeader(context, ref),
+                
+                const SizedBox(height: 56),
 
-              // Big "Iniciar actividad" button with circular progress / indicator
-              _buildStartButton(context, ref),
+                // Big "Iniciar actividad" button with circular progress / indicator
+                _buildStartButton(context, ref),
 
-              const SizedBox(height: 56),
+                const SizedBox(height: 56),
 
-              // Recent activities title
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                child: Text(
-                  'Actividades Recientes',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.5,
+                // Recent activities title
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Actividades Recientes',
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.refresh),
+                        onPressed: () {
+                          ref.read(activitiesProvider.notifier).refreshActivities();
+                        },
+                      ),
+                    ],
                   ),
                 ),
-              ),
 
-              const SizedBox(height: 12),
+                const SizedBox(height: 12),
 
-              // Dynamic list of recorded activities (Empty state if empty)
-              _buildRecentActivitiesList(context, activities),
-              
-              const SizedBox(height: 24),
-            ],
+                // Dynamic list of recorded activities (Empty state if empty)
+                _buildRecentActivitiesList(context, ref, activitiesAsync),
+                
+                const SizedBox(height: 24),
+              ],
+            ),
           ),
         ),
       ),
@@ -413,112 +397,102 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildRecentActivitiesList(BuildContext context, List<ActivitySession> activities) {
+  Widget _buildRecentActivitiesList(BuildContext context, WidgetRef ref, AsyncValue<List<BackendActivity>> activitiesAsync) {
     final theme = Theme.of(context);
 
-    // Empty state representation
-    if (activities.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24.0),
-        child: Card(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 32.0, horizontal: 16.0),
-            child: Column(
-              children: [
-                Icon(
-                  Icons.history_toggle_off_rounded,
-                  size: 56,
-                  color: theme.colorScheme.onSurface.withOpacity(0.3),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Sin actividades registradas',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Las rutas que grabes y finalices aparecerán listadas aquí.',
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurface.withOpacity(0.5),
-                  ),
-                ),
-              ],
-            ),
+    return activitiesAsync.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.all(32.0),
+        child: Center(
+          child: Column(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Cargando actividades...'),
+            ],
           ),
         ),
-      );
-    }
-
-    // Dynamic list
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24.0),
-      child: ListView.separated(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: activities.length,
-        separatorBuilder: (context, index) => const SizedBox(height: 12),
-        itemBuilder: (context, index) {
-          final session = activities[index];
-          final title = session.title;
-          final icon = _resolveIcon(title);
-          final color = _resolveColor(title);
-          final dateStr = DateFormat('dd MMM yyyy, hh:mm a', 'es').format(session.startTime);
-
-          return Card(
+      ),
+      error: (error, stack) {
+        final message = ref.read(activitiesProvider.notifier).getErrorMessage(error);
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24.0),
+          child: Card(
             child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Row(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: color.withOpacity(0.15),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      icon,
-                      color: color,
-                    ),
+                  Icon(Icons.error_outline, size: 48, color: theme.colorScheme.error),
+                  const SizedBox(height: 16),
+                  Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyMedium,
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          dateStr,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurface.withOpacity(0.5),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            _buildMiniStat(theme, 'Distancia', '${session.stats.distanceKm.toStringAsFixed(2)} km'),
-                            _buildMiniStat(theme, 'Duración', _formatDuration(session.stats.duration)),
-                            _buildMiniStat(theme, 'Vel. Promedio', '${session.stats.averageSpeedKmH.toStringAsFixed(1)} km/h'),
-                          ],
-                        )
-                      ],
-                    ),
-                  )
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    onPressed: () => ref.read(activitiesProvider.notifier).refreshActivities(),
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Reintentar'),
+                  ),
                 ],
               ),
             ),
+          ),
+        );
+      },
+      data: (activities) {
+        // Empty state representation
+        if (activities.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+            child: Card(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 32.0, horizontal: 16.0),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.history_toggle_off_rounded,
+                      size: 56,
+                      color: theme.colorScheme.onSurface.withOpacity(0.3),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Todavía no tienes actividades registradas.',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Las rutas que grabes y finalices aparecerán listadas aquí.',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurface.withOpacity(0.5),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           );
-        },
-      ),
+        }
+
+        // Dynamic list
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24.0),
+          child: ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: activities.length,
+            separatorBuilder: (context, index) => const SizedBox(height: 12),
+            itemBuilder: (context, index) {
+              return BackendActivityCard(activity: activities[index]);
+            },
+          ),
+        );
+      },
     );
   }
 

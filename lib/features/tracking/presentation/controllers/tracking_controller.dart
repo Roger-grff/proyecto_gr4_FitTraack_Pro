@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:proyecto_gr4/core/errors/tracking_error.dart';
+import 'package:proyecto_gr4/features/tracking/presentation/controllers/activities_controller.dart';
+import 'package:proyecto_gr4/features/tracking/presentation/controllers/tracking_state.dart';
 import 'package:proyecto_gr4/features/tracking/data/tracking_repository.dart';
 import 'package:proyecto_gr4/features/tracking/domain/activity_session.dart';
 import 'package:proyecto_gr4/features/tracking/domain/location_point.dart';
@@ -176,8 +178,11 @@ class TrackingNotifier extends Notifier<TrackingState> {
         weather: pending.weather,
       );
 
-      // Si tiene exito, agregar a lista local
+      // Si tiene exito, agregar a lista local (temporalmente)
       ref.read(completedActivitiesProvider.notifier).addActivity(pending.session);
+      
+      // Invalidar el proveedor de red para que el historial se recargue al volver
+      ref.invalidate(activitiesProvider);
 
       state = state.copyWith(
         status: TrackingStatus.finished,
