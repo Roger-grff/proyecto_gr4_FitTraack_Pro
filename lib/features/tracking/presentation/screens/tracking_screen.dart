@@ -38,16 +38,8 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
     final duration = ref.watch(timerProvider);
     final theme = Theme.of(context);
 
-    // Watch status and navigate to summary once completed
+    // Watch status
     ref.listen<TrackingState>(trackingProvider, (previous, next) {
-      if (next.status == TrackingStatus.finished && next.finishedSession != null) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (context) => SummaryScreen(session: next.finishedSession!),
-          ),
-        );
-      }
-      
       // Dynamic GPS status alert message that appears and disappears automatically
       if (next.routePoints.isNotEmpty && !_gpsActiveAlertShown && next.status == TrackingStatus.tracking) {
         setState(() {
@@ -353,6 +345,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
 
   Widget _buildControls(BuildContext context, WidgetRef ref, TrackingStatus status) {
     final notifier = ref.read(trackingProvider.notifier);
+    final isSaving = ref.watch(trackingProvider).isSavingActivity;
 
     if (status == TrackingStatus.tracking) {
       return Row(
@@ -371,28 +364,31 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
           ),
         ],
       );
-    } else if (status == TrackingStatus.paused) {
+    } else if (status == TrackingStatus.paused || status == TrackingStatus.finished) {
       return Row(
         children: [
           // Resume button
-          Expanded(
-            child: ElevatedButton.icon(
-              onPressed: () => notifier.resumeActivity(),
-              icon: const Icon(Icons.play_arrow, color: Colors.white),
-              label: const Text('REANUDAR', style: TextStyle(fontWeight: FontWeight.bold)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryColor,
-                foregroundColor: Colors.white,
+          if (status == TrackingStatus.paused && !isSaving)
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () => notifier.resumeActivity(),
+                icon: const Icon(Icons.play_arrow, color: Colors.white),
+                label: const Text('REANUDAR', style: TextStyle(fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryColor,
+                  foregroundColor: Colors.white,
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 12),
+          if (status == TrackingStatus.paused && !isSaving) const SizedBox(width: 12),
           // Finish button
           Expanded(
             child: ElevatedButton.icon(
-              onPressed: () => _showNamingDialog(context, notifier),
-              icon: const Icon(Icons.stop, color: Colors.white),
-              label: const Text('FINALIZAR', style: TextStyle(fontWeight: FontWeight.bold)),
+              onPressed: isSaving ? null : () => _showNamingDialog(context, notifier),
+              icon: isSaving 
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) 
+                  : const Icon(Icons.stop, color: Colors.white),
+              label: Text(isSaving ? 'GUARDANDO...' : 'FINALIZAR', style: const TextStyle(fontWeight: FontWeight.bold)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.red,
                 foregroundColor: Colors.white,
@@ -406,18 +402,79 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
     return const SizedBox.shrink();
   }
 
+  void _showErrorDialog(BuildContext context, WidgetRef ref, String message) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return Consumer(
+          builder: (context, ref, _) {
+            final isSaving = ref.watch(trackingProvider).isSavingActivity;
+            
+            return AlertDialog(
+              title: const Text('Error al guardar', style: TextStyle(fontWeight: FontWeight.bold)),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(message),
+                  if (isSaving) ...[
+                    const SizedBox(height: 20),
+                    const CircularProgressIndicator(),
+                    const SizedBox(height: 10),
+                    const Text('Reintentando...'),
+                  ]
+                ],
+              ),
+              actions: [
+                if (!isSaving)
+                  TextButton(
+                    onPressed: () => Navigator.pop(dialogContext),
+                    child: const Text('CANCELAR'),
+                  ),
+                if (!isSaving)
+                  TextButton(
+                    onPressed: () async {
+                      try {
+                        final result = await ref.read(trackingProvider.notifier).retryPendingActivitySave();
+                        if (!context.mounted) return;
+                        Navigator.pop(dialogContext);
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => SummaryScreen(session: result.localSession),
+                          ),
+                        );
+                      } catch (e) {
+                        // El error se actualiza en el provider o lo atrapamos aquí para mostrarlo en el snackbar
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                           SnackBar(content: Text('Falló el reintento: ${ref.read(trackingProvider).saveActivityError ?? e.toString()}'))
+                        );
+                      }
+                    },
+                    child: const Text('REINTENTAR', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+              ],
+            );
+          }
+        );
+      }
+    );
+  }
+
   // Dialog to select/input a custom name before saving the session
   void _showNamingDialog(BuildContext context, TrackingNotifier notifier) {
-    String selectedCategory = 'Carrera matutina';
+    String selectedCategory = 'running';
     final customNameController = TextEditingController();
-    bool useCustomName = false;
 
     showDialog(
       context: context,
       barrierDismissible: false, // Force making a choice
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
+      builder: (dialogContext) {
+        return Consumer(
+          builder: (context, ref, _) {
+            final isSaving = ref.watch(trackingProvider).isSavingActivity;
+            
             return AlertDialog(
               title: const Text(
                 'Etiquetar Recorrido',
@@ -428,55 +485,33 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Text('Elige una etiqueta para guardar tu recorrido:'),
-                    const SizedBox(height: 12),
-                    
-                    // Predefined options
-                    RadioListTile<String>(
-                      title: const Text('Carrera matutina'),
-                      value: 'Carrera matutina',
-                      groupValue: useCustomName ? null : selectedCategory,
-                      onChanged: (value) {
-                        setDialogState(() {
-                          useCustomName = false;
-                          selectedCategory = value!;
-                        });
-                      },
-                    ),
-                    RadioListTile<String>(
-                      title: const Text('Ciclismo de ruta'),
-                      value: 'Ciclismo de ruta',
-                      groupValue: useCustomName ? null : selectedCategory,
-                      onChanged: (value) {
-                        setDialogState(() {
-                          useCustomName = false;
-                          selectedCategory = value!;
-                        });
-                      },
-                    ),
-                    RadioListTile<String>(
-                      title: const Text('Caminata'),
-                      value: 'Caminata',
-                      groupValue: useCustomName ? null : selectedCategory,
-                      onChanged: (value) {
-                        setDialogState(() {
-                          useCustomName = false;
-                          selectedCategory = value!;
-                        });
-                      },
-                    ),
-                    RadioListTile<bool>(
-                      title: const Text('Nombre personalizado'),
-                      value: true,
-                      groupValue: useCustomName,
-                      onChanged: (value) {
-                        setDialogState(() {
-                          useCustomName = value!;
-                        });
-                      },
-                    ),
-                    
-                    if (useCustomName) ...[
+                    if (isSaving) ...[
+                      const Center(child: CircularProgressIndicator()),
+                      const SizedBox(height: 16),
+                      const Center(child: Text('Guardando actividad...', style: TextStyle(fontWeight: FontWeight.bold))),
+                    ] else ...[
+                      const Text('Elige una etiqueta para guardar tu recorrido:'),
+                      const SizedBox(height: 12),
+                      
+                      RadioListTile<String>(
+                        title: const Text('Correr'),
+                        value: 'running',
+                        groupValue: selectedCategory,
+                        onChanged: (value) {
+                          if (value != null) selectedCategory = value;
+                          (context as Element).markNeedsBuild();
+                        },
+                      ),
+                      RadioListTile<String>(
+                        title: const Text('Caminar'),
+                        value: 'walking',
+                        groupValue: selectedCategory,
+                        onChanged: (value) {
+                          if (value != null) selectedCategory = value;
+                          (context as Element).markNeedsBuild();
+                        },
+                      ),
+                      
                       const SizedBox(height: 8),
                       TextField(
                         controller: customNameController,
@@ -487,37 +522,53 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                           contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         ),
                       ),
-                    ],
+                    ]
                   ],
                 ),
               ),
               actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('CANCELAR'),
-                ),
-                TextButton(
-                  onPressed: () {
-                    // Decide which name to save
-                    String finalTitle = selectedCategory;
-                    if (useCustomName) {
-                      finalTitle = customNameController.text.trim();
-                      if (finalTitle.isEmpty) {
-                        finalTitle = 'Actividad Personalizada';
-                      }
-                    }
-                    
-                    Navigator.pop(context); // Close dialog
-                    notifier.finishActivity(finalTitle); // Complete tracking
-                  },
-                  child: const Text(
-                    'GUARDAR Y FINALIZAR',
-                    style: TextStyle(fontWeight: FontWeight.bold),
+                if (!isSaving)
+                  TextButton(
+                    onPressed: () => Navigator.pop(dialogContext),
+                    child: const Text('CANCELAR'),
                   ),
-                ),
+                if (!isSaving)
+                  TextButton(
+                    onPressed: () async {
+                      String finalTitle = customNameController.text.trim();
+                      if (finalTitle.isEmpty) {
+                        finalTitle = selectedCategory == 'running' ? 'Carrera' : 'Caminata';
+                      }
+                      
+                      try {
+                        final result = await notifier.finishAndSaveActivity(
+                          title: finalTitle,
+                          type: selectedCategory,
+                        );
+                        if (!context.mounted) return;
+                        
+                        Navigator.pop(dialogContext); // Close dialog
+                        
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => SummaryScreen(session: result.localSession),
+                          ),
+                        );
+                      } catch (e) {
+                        if (!context.mounted) return;
+                        Navigator.pop(dialogContext);
+                        _showErrorDialog(context, ref, ref.read(trackingProvider).saveActivityError ?? e.toString());
+                      }
+                    },
+                    child: const Text(
+                      'GUARDAR Y FINALIZAR',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
               ],
             );
-          },
+          }
         );
       },
     );

@@ -18,6 +18,25 @@ class ActivitySession {
     required this.stats,
   });
 
+  Map<String, dynamic> toBackendMap({
+    required String type,
+    String description = '',
+    Map<String, dynamic>? weather,
+  }) {
+    final normalizedType = (type.toLowerCase() == 'walking') ? 'walking' : 'running';
+
+    return {
+      'type': normalizedType,
+      'title': title,
+      'description': description,
+      'startedAt': startTime.toIso8601String(),
+      'endedAt': endTime.toIso8601String(),
+      'distance': stats.distanceKm,
+      'trackPoints': routePoints.map((p) => p.toBackendMap()).toList(),
+      'weather': weather,
+    };
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'id': id,

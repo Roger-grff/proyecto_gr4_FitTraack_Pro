@@ -15,6 +15,8 @@ class TrackingState {
   final TrackingStats stats;
   final String? errorMessage;
   final ActivitySession? finishedSession;
+  final bool isSavingActivity;
+  final String? saveActivityError;
 
   TrackingState({
     this.status = TrackingStatus.idle,
@@ -22,6 +24,8 @@ class TrackingState {
     required this.stats,
     this.errorMessage,
     this.finishedSession,
+    this.isSavingActivity = false,
+    this.saveActivityError,
   });
 
   factory TrackingState.initial() {
@@ -37,6 +41,9 @@ class TrackingState {
     String? errorMessage,
     ActivitySession? finishedSession,
     bool clearError = false,
+    bool? isSavingActivity,
+    String? saveActivityError,
+    bool clearSaveError = false,
   }) {
     return TrackingState(
       status: status ?? this.status,
@@ -44,6 +51,8 @@ class TrackingState {
       stats: stats ?? this.stats,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
       finishedSession: finishedSession ?? this.finishedSession,
+      isSavingActivity: isSavingActivity ?? this.isSavingActivity,
+      saveActivityError: clearSaveError ? null : (saveActivityError ?? this.saveActivityError),
     );
   }
 }
