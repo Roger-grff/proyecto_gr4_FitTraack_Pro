@@ -6,6 +6,7 @@ import 'package:proyecto_gr4/features/auth/presentation/controllers/auth_provide
 import 'package:proyecto_gr4/features/auth/presentation/screens/login_screen.dart';
 import 'package:proyecto_gr4/features/tracking/data/models/backend_activity.dart';
 import 'package:proyecto_gr4/features/tracking/presentation/controllers/activities_controller.dart';
+import 'package:proyecto_gr4/features/tracking/presentation/screens/activity_detail_screen.dart';
 import 'package:proyecto_gr4/features/tracking/presentation/widgets/backend_activity_card.dart';
 import 'settings_screen.dart';
 
@@ -170,7 +171,16 @@ class ProfileScreen extends ConsumerWidget {
                   return Column(
                     children: data.map((activity) => Padding(
                       padding: const EdgeInsets.only(bottom: 10),
-                      child: BackendActivityCard(activity: activity),
+                      child: BackendActivityCard(
+                        activity: activity,
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => ActivityDetailScreen(activityId: activity.id),
+                            ),
+                          );
+                        },
+                      ),
                     )).toList(),
                   );
                 },

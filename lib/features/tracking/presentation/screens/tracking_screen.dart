@@ -75,6 +75,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
     }
 
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(
         title: Text(
           trackingState.status == TrackingStatus.paused ? 'Actividad Pausada' : 'Grabando Recorrido',

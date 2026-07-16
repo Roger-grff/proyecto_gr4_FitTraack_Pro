@@ -57,68 +57,72 @@ class BackendActivityCard extends StatelessWidget {
     final durationStr = _formatDuration(activity.durationSeconds);
 
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.15),
-                shape: BoxShape.circle,
+      clipBehavior: Clip.hardEdge,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  icon,
+                  color: color,
+                ),
               ),
-              child: Icon(
-                icon,
-                color: color,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    activity.title,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      activity.title,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Row(
-                    children: [
-                      Text(
-                        _translateType(activity.type),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: color,
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Text(
+                          _translateType(activity.type),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: color,
+                          ),
                         ),
-                      ),
-                      Text(
-                        ' • $dateStr',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurface.withOpacity(0.5),
+                        Text(
+                          ' • $dateStr',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurface.withOpacity(0.5),
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _buildMiniStat(theme, 'Distancia', '${activity.distanceKm.toStringAsFixed(2)} km'),
-                      _buildMiniStat(theme, 'Duración', durationStr),
-                      if (activity.avgSpeed > 0)
-                        _buildMiniStat(theme, 'Vel. Promedio', '${activity.avgSpeed.toStringAsFixed(1)} km/h')
-                      else if (activity.avgPace > 0)
-                        _buildMiniStat(theme, 'Ritmo', '${activity.avgPace.toStringAsFixed(2)} /km'),
-                    ],
-                  )
-                ],
-              ),
-            )
-          ],
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _buildMiniStat(theme, 'Distancia', '${activity.distanceKm.toStringAsFixed(2)} km'),
+                        _buildMiniStat(theme, 'Duración', durationStr),
+                        if (activity.avgSpeed > 0)
+                          _buildMiniStat(theme, 'Vel. Promedio', '${activity.avgSpeed.toStringAsFixed(1)} km/h')
+                        else if (activity.avgPace > 0)
+                          _buildMiniStat(theme, 'Ritmo', '${activity.avgPace.toStringAsFixed(2)} /km'),
+                      ],
+                    )
+                  ],
+                ),
+              )
+            ],
+          ),
         ),
       ),
     );

@@ -7,6 +7,7 @@ import 'package:proyecto_gr4/features/tracking/presentation/controllers/tracking
 import 'package:proyecto_gr4/features/tracking/presentation/controllers/tracking_state.dart';
 import 'package:intl/intl.dart';
 import 'package:proyecto_gr4/features/tracking/presentation/controllers/activities_controller.dart';
+import 'package:proyecto_gr4/features/tracking/presentation/screens/activity_detail_screen.dart';
 import 'package:proyecto_gr4/features/tracking/presentation/widgets/backend_activity_card.dart';
 import 'package:proyecto_gr4/features/tracking/data/models/backend_activity.dart';
 import 'tracking_screen.dart';
@@ -488,10 +489,18 @@ class HomeScreen extends ConsumerWidget {
             itemCount: activities.length,
             separatorBuilder: (context, index) => const SizedBox(height: 12),
             itemBuilder: (context, index) {
-              return BackendActivityCard(activity: activities[index]);
+              return BackendActivityCard(
+                activity: activities[index],
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => ActivityDetailScreen(activityId: activities[index].id),
+                    ),
+                  );
+                },
+              );
             },
           ),
-        );
       },
     );
   }
