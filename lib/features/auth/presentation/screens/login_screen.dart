@@ -10,6 +10,7 @@ import 'package:proyecto_gr4/features/auth/presentation/controllers/auth_provide
 import 'package:proyecto_gr4/features/auth/presentation/controllers/auth_state.dart';
 import 'package:proyecto_gr4/features/auth/presentation/screens/forgot_password_screen.dart';
 import 'package:proyecto_gr4/features/auth/presentation/screens/register_screen.dart';
+import 'package:proyecto_gr4/features/tracking/presentation/screens/home_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -56,16 +57,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     super.dispose();
   }
 
-  void _submitForm() {
+  Future<void> _submitForm() async {
     // Hide keyboard
     FocusScope.of(context).unfocus();
 
     if (_formKey.currentState!.validate()) {
       _saveRememberMe(_rememberMe);
-      ref.read(authProvider.notifier).signIn(
+      await ref.read(authProvider.notifier).signIn(
             _emailController.text.trim(),
             _passwordController.text,
           );
+      if (!mounted || ref.read(authProvider).status != AuthStatus.authenticated) {
+        return;
+      }
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+        (route) => false,
+      );
     }
   }
 

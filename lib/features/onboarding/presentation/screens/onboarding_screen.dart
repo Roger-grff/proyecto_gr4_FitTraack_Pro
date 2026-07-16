@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:proyecto_gr4/features/auth/presentation/screens/login_screen.dart';
 import 'package:proyecto_gr4/features/onboarding/presentation/widgets/onboarding_page.dart';
 import 'package:proyecto_gr4/features/onboarding/presentation/widgets/page_indicator.dart';
@@ -35,7 +36,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     },
   ];
 
-  void _onSkip() {
+  Future<void> _onSkip() async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setBool('onboarding_completed', true);
+    if (!mounted) return;
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (context) => const LoginScreen()),
     );

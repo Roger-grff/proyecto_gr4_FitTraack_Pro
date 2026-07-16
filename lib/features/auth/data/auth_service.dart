@@ -73,7 +73,9 @@ class AuthService {
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      return AppUser.fromJson(data);
+      // El backend responde { user: { ... } }, no el usuario directamente.
+      final userJson = data['user'] as Map<String, dynamic>;
+      return AppUser.fromJson(userJson);
     } else {
       throw Exception('Sesión expirada o token inválido');
     }

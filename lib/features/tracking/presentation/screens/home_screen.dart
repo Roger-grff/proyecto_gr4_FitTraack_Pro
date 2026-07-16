@@ -8,6 +8,7 @@ import 'package:proyecto_gr4/features/tracking/presentation/controllers/tracking
 import 'package:intl/intl.dart';
 import 'tracking_screen.dart';
 import 'settings_screen.dart';
+import 'profile_screen.dart';
 import 'package:proyecto_gr4/core/providers/settings_provider.dart';
 import 'package:proyecto_gr4/core/services/weather_service.dart';
 import 'package:proyecto_gr4/core/services/elevation_service.dart';
@@ -168,16 +169,22 @@ class HomeScreen extends ConsumerWidget {
                 },
               ),
               const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: AppTheme.primaryColor, width: 2),
+              InkWell(
+                borderRadius: BorderRadius.circular(28),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (context) => const ProfileScreen()),
                 ),
-                child: const CircleAvatar(
-                  radius: 24,
-                  backgroundColor: AppTheme.cardDarkBackground,
-                  child: Icon(Icons.person, color: Colors.white, size: 28),
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppTheme.primaryColor, width: 2),
+                  ),
+                  child: const CircleAvatar(
+                    radius: 24,
+                    backgroundColor: AppTheme.cardDarkBackground,
+                    child: Icon(Icons.person, color: Colors.white, size: 28),
+                  ),
                 ),
               ),
             ],

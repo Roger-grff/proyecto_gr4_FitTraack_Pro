@@ -7,9 +7,9 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
 
     <application
-        android:label="proyecto_gr4"
+        android:label="FitTrack Pro"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@drawable/ic_fittrack_launcher">
         <activity
             android:name=".MainActivity"
             android:exported="true"
