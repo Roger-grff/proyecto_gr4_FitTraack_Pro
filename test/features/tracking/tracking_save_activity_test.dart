@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:proyecto_gr4/features/tracking/presentation/controllers/tracking_controller.dart';
-import 'package:proyecto_gr4/features/tracking/presentation/controllers/tracking_state.dart';
+
 import 'package:proyecto_gr4/features/tracking/data/activity_service.dart';
 import 'package:proyecto_gr4/features/tracking/data/activity_service_provider.dart';
 import 'package:proyecto_gr4/features/tracking/domain/activity_session.dart';
@@ -51,7 +51,7 @@ class FakeActivityService implements ActivityService {
       avgSpeed: 0,
       caloriesBurned: 0,
       startedAt: session.startTime,
-      endedAt: session.endTime,
+      endedAt: session.endTime!,
     );
 
     return CreateActivityResult(
@@ -132,7 +132,7 @@ void main() {
 
     test('8, 9, 10, 11, 12. Errores no agregan la actividad y la mantienen pendiente para reintento', () async {
       final notifier = container.read(trackingProvider.notifier);
-      final listNotifier = container.read(completedActivitiesProvider.notifier);
+
       
       await notifier.startActivity();
       fakeService.shouldThrow500 = true;

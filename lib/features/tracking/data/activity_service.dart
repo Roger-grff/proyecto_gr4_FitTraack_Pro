@@ -4,6 +4,7 @@ import 'package:proyecto_gr4/features/tracking/domain/activity_session.dart';
 import 'package:proyecto_gr4/features/tracking/data/models/backend_activity.dart';
 import 'package:proyecto_gr4/features/tracking/data/models/activity_detail_result.dart';
 import 'package:proyecto_gr4/features/tracking/data/models/create_activity_result.dart';
+import 'package:proyecto_gr4/features/tracking/data/models/update_activity_request.dart';
 
 class ActivityService {
   final ApiClient apiClient;
@@ -77,5 +78,22 @@ class ActivityService {
 
     final url = '${ApiConstants.activities}/$id';
     await apiClient.deleteJson(url);
+  }
+
+  Future<void> updateActivity(String id, UpdateActivityRequest request) async {
+    if (id.isEmpty) {
+      throw ArgumentError('El id no puede estar vacío.');
+    }
+
+    final body = request.toJson();
+    if (body.isEmpty) {
+      throw ArgumentError('At least one field must be provided for update.');
+    }
+
+    final url = '${ApiConstants.activities}/$id';
+    await apiClient.patchJson(
+      url,
+      body: body,
+    );
   }
 }

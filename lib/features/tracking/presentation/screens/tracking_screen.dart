@@ -6,6 +6,8 @@ import 'package:proyecto_gr4/core/theme/app_theme.dart';
 import 'package:proyecto_gr4/features/tracking/presentation/controllers/tracking_controller.dart';
 import 'package:proyecto_gr4/features/tracking/presentation/controllers/tracking_state.dart';
 import 'package:proyecto_gr4/features/tracking/presentation/controllers/timer_controller.dart';
+import 'package:proyecto_gr4/features/tracking/domain/activity_type.dart';
+import 'package:proyecto_gr4/features/tracking/presentation/utils/activity_type_ui.dart';
 import 'summary_screen.dart';
 
 class TrackingScreen extends ConsumerStatefulWidget {
@@ -465,7 +467,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
 
   // Dialog to select/input a custom name before saving the session
   void _showNamingDialog(BuildContext context, TrackingNotifier notifier) {
-    String selectedCategory = 'running';
+    ActivityType selectedCategory = ActivityType.running;
     final customNameController = TextEditingController();
 
     showDialog(
@@ -494,24 +496,23 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                       const Text('Elige una etiqueta para guardar tu recorrido:'),
                       const SizedBox(height: 12),
                       
-                      RadioListTile<String>(
-                        title: const Text('Correr'),
-                        value: 'running',
+                      ...ActivityType.values.map((type) => RadioListTile<ActivityType>(
+                        title: Row(
+                          children: [
+                            Icon(type.icon, color: type.color),
+                            const SizedBox(width: 8),
+                            Text(type.displayName),
+                          ],
+                        ),
+                        value: type,
                         groupValue: selectedCategory,
                         onChanged: (value) {
-                          if (value != null) selectedCategory = value;
-                          (context as Element).markNeedsBuild();
+                          if (value != null) {
+                            selectedCategory = value;
+                            (context as Element).markNeedsBuild();
+                          }
                         },
-                      ),
-                      RadioListTile<String>(
-                        title: const Text('Caminar'),
-                        value: 'walking',
-                        groupValue: selectedCategory,
-                        onChanged: (value) {
-                          if (value != null) selectedCategory = value;
-                          (context as Element).markNeedsBuild();
-                        },
-                      ),
+                      )),
                       
                       const SizedBox(height: 8),
                       TextField(
@@ -538,13 +539,13 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen> {
                     onPressed: () async {
                       String finalTitle = customNameController.text.trim();
                       if (finalTitle.isEmpty) {
-                        finalTitle = selectedCategory == 'running' ? 'Carrera' : 'Caminata';
+                        finalTitle = selectedCategory.displayName;
                       }
                       
                       try {
                         final result = await notifier.finishAndSaveActivity(
                           title: finalTitle,
-                          type: selectedCategory,
+                          type: selectedCategory.apiValue,
                         );
                         if (!context.mounted) return;
                         

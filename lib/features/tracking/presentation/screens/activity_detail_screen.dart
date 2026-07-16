@@ -5,6 +5,11 @@ import 'package:latlong2/latlong.dart';
 import 'package:intl/intl.dart';
 import 'package:proyecto_gr4/core/theme/app_theme.dart';
 import 'package:proyecto_gr4/features/tracking/data/models/activity_detail_result.dart';
+import 'package:proyecto_gr4/features/tracking/data/models/backend_activity.dart';
+import 'package:proyecto_gr4/features/tracking/presentation/utils/activity_type_ui.dart';
+import 'package:proyecto_gr4/features/tracking/presentation/screens/edit_activity_screen.dart';
+import 'package:proyecto_gr4/features/tracking/data/models/backend_track_point.dart';
+import 'package:proyecto_gr4/features/tracking/presentation/controllers/activity_detail_controller.dart';
 import 'package:proyecto_gr4/features/tracking/data/models/backend_track_point.dart';
 import 'package:proyecto_gr4/features/tracking/presentation/controllers/activity_detail_controller.dart';
 
@@ -36,10 +41,21 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
     return '$m:$s';
   }
 
-  String _translateType(String type) {
-    if (type == 'running') return 'Correr';
-    if (type == 'walking') return 'Caminar';
-    return type;
+  Future<void> _openEditScreen(BackendActivity activity) async {
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EditActivityScreen(activity: activity),
+      ),
+    );
+
+    if (result == true && mounted) {
+      ref.invalidate(activitiesProvider);
+      ref.invalidate(activityDetailProvider(widget.activityId));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Actividad actualizada correctamente.')),
+      );
+    }
   }
 
   Future<void> _deleteActivity() async {
@@ -154,7 +170,6 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
 
   Widget _buildDetail(BuildContext context, ActivityDetailResult result, ThemeData theme, WidgetRef ref) {
     final activity = result.activity;
-    final stats = result.activityStats;
     final trackPoints = result.trackPoints;
 
     final dateStr = DateFormat('dd MMM yyyy, HH:mm').format(activity.startedAt.toLocal());
@@ -169,10 +184,10 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
             child: Row(
               children: [
                 CircleAvatar(
-                  backgroundColor: activity.type == 'running' ? Colors.cyan.withValues(alpha: 0.2) : Colors.orange.withValues(alpha: 0.2),
+                  backgroundColor: ActivityTypeHelper.getColor(activity.type).withValues(alpha: 0.2),
                   child: Icon(
-                    activity.type == 'running' ? Icons.directions_run : Icons.directions_walk,
-                    color: activity.type == 'running' ? Colors.cyan : Colors.orange,
+                    ActivityTypeHelper.getIcon(activity.type),
+                    color: ActivityTypeHelper.getColor(activity.type),
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -185,11 +200,15 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                         style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       Text(
-                        '${_translateType(activity.type)} • $dateStr',
+                        '${ActivityTypeHelper.translate(activity.type)} • $dateStr',
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                         ),
                       ),
+                      if (activity.description.isNotEmpty) ...[
+                        const SizedBox(height: 16),
+                        Text(activity.description, style: theme.textTheme.bodyMedium),
+                      ],
                     ],
                   ),
                 ),
@@ -198,7 +217,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
           ),
 
           // Map
-          if (trackPoints == null || trackPoints.isEmpty)
+          if (trackPoints.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Container(
@@ -245,11 +264,11 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                         _buildStat(theme, 'Duración', _formatDuration(activity.durationSeconds), Icons.timer),
                         _buildStat(
                           theme, 
-                          activity.type == 'running' ? 'Ritmo Medio' : 'Vel. Media', 
-                          activity.type == 'running' 
+                          activity.type == 'running' || activity.type == 'walking' ? 'Ritmo Medio' : 'Vel. Media', 
+                          activity.type == 'running' || activity.type == 'walking'
                             ? (activity.avgPace > 0 ? '${activity.avgPace.toStringAsFixed(2)} min/km' : '0.0 min/km')
                             : (activity.avgSpeed > 0 ? '${activity.avgSpeed.toStringAsFixed(2)} km/h' : '0.0 km/h'),
-                          activity.type == 'running' ? Icons.directions_run : Icons.speed,
+                          activity.type == 'running' || activity.type == 'walking' ? ActivityTypeHelper.getIcon(activity.type) : Icons.speed,
                         ),
                       ],
                     ),
@@ -264,6 +283,19 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
                     ]
                   ],
                 ),
+              ),
+            ),
+          ),
+
+          // Action buttons
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            child: FilledButton.icon(
+              onPressed: _isDeleting ? null : () => _openEditScreen(activity),
+              icon: const Icon(Icons.edit),
+              label: const Text('Editar actividad'),
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
               ),
             ),
           ),

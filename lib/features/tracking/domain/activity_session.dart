@@ -1,3 +1,4 @@
+import 'package:proyecto_gr4/features/tracking/domain/activity_type.dart';
 import 'location_point.dart';
 import 'tracking_stats.dart';
 
@@ -5,7 +6,7 @@ class ActivitySession {
   final String id;
   final String title;
   final DateTime startTime;
-  final DateTime endTime;
+  DateTime? endTime;
   final List<LocationPoint> routePoints;
   final TrackingStats stats;
 
@@ -13,7 +14,7 @@ class ActivitySession {
     required this.id,
     required this.title,
     required this.startTime,
-    required this.endTime,
+    this.endTime,
     required this.routePoints,
     required this.stats,
   });
@@ -23,14 +24,18 @@ class ActivitySession {
     String description = '',
     Map<String, dynamic>? weather,
   }) {
-    final normalizedType = (type.toLowerCase() == 'walking') ? 'walking' : 'running';
+    if (endTime == null) {
+      throw StateError('Cannot map to backend format without an endTime.');
+    }
+
+    final validActivityType = ActivityType.fromApiValue(type);
 
     return {
-      'type': normalizedType,
+      'type': validActivityType.apiValue,
       'title': title,
       'description': description,
       'startedAt': startTime.toIso8601String(),
-      'endedAt': endTime.toIso8601String(),
+      'endedAt': endTime!.toIso8601String(),
       'distance': stats.distanceKm,
       'trackPoints': routePoints.map((p) => p.toBackendMap()).toList(),
       'weather': weather,
@@ -42,7 +47,7 @@ class ActivitySession {
       'id': id,
       'title': title,
       'startTime': startTime.toIso8601String(),
-      'endTime': endTime.toIso8601String(),
+      'endTime': endTime?.toIso8601String() ?? startTime.toIso8601String(),
       'routePoints': routePoints.map((p) => p.toJson()).toList(),
       'stats': stats.toJson(),
     };

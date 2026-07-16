@@ -5,8 +5,6 @@ import 'package:proyecto_gr4/features/tracking/data/activity_service_provider.da
 import 'package:proyecto_gr4/features/tracking/data/models/backend_activity.dart';
 import 'package:proyecto_gr4/features/tracking/presentation/controllers/activities_controller.dart';
 import 'package:proyecto_gr4/core/errors/api_exception.dart';
-import 'package:proyecto_gr4/features/tracking/domain/activity_session.dart';
-import 'package:proyecto_gr4/features/tracking/data/models/create_activity_result.dart';
 
 class FakeActivityService implements ActivityService {
   List<BackendActivity> mockActivities = [];

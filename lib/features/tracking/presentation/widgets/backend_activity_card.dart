@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:proyecto_gr4/core/theme/app_theme.dart';
 import 'package:proyecto_gr4/features/tracking/data/models/backend_activity.dart';
+import 'package:proyecto_gr4/features/tracking/presentation/utils/activity_type_ui.dart';
 
 class BackendActivityCard extends StatelessWidget {
   final BackendActivity activity;
@@ -20,40 +20,11 @@ class BackendActivityCard extends StatelessWidget {
     return '${minutes}m ${seconds}s';
   }
 
-  String _translateType(String type) {
-    switch (type.toLowerCase()) {
-      case 'running':
-        return 'Correr';
-      case 'walking':
-        return 'Caminar';
-      default:
-        return 'Actividad';
-    }
-  }
-
-  IconData _resolveIcon(String type) {
-    if (type.toLowerCase() == 'running') {
-      return Icons.directions_run;
-    } else if (type.toLowerCase() == 'walking') {
-      return Icons.directions_walk;
-    }
-    return Icons.fitness_center;
-  }
-
-  Color _resolveColor(String type) {
-    if (type.toLowerCase() == 'running') {
-      return const Color(0xFF00F5D4); // Cyan/Teal
-    } else if (type.toLowerCase() == 'walking') {
-      return const Color(0xFFFF9F1C); // Orange
-    }
-    return AppTheme.primaryColor;
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final icon = _resolveIcon(activity.type);
-    final color = _resolveColor(activity.type);
+    final icon = ActivityTypeHelper.getIcon(activity.type);
+    final color = ActivityTypeHelper.getColor(activity.type);
     final dateStr = DateFormat("EEE, d 'de' MMM · HH:mm", 'es').format(activity.startedAt);
     final durationStr = _formatDuration(activity.durationSeconds);
 
@@ -93,7 +64,7 @@ class BackendActivityCard extends StatelessWidget {
                     Row(
                       children: [
                         Text(
-                          _translateType(activity.type),
+                          ActivityTypeHelper.translate(activity.type),
                           style: theme.textTheme.bodySmall?.copyWith(
                             fontWeight: FontWeight.w600,
                             color: color,

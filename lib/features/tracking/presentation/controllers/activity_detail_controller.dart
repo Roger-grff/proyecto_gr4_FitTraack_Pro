@@ -1,5 +1,4 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:proyecto_gr4/features/tracking/data/activity_service.dart';
 import 'package:proyecto_gr4/features/tracking/data/activity_service_provider.dart';
 import 'package:proyecto_gr4/features/tracking/data/models/activity_detail_result.dart';
 

@@ -45,8 +45,8 @@ class BackendActivity {
     return BackendActivity(
       id: json['_id'] as String,
       userId: json['userId'] as String?,
-      type: json['type'] as String? ?? 'running',
-      title: json['title'] as String? ?? 'Actividad sin título',
+      type: json['type'] as String? ?? 'unknown',
+      title: json['title'] as String? ?? 'Actividad',
       description: json['description'] as String? ?? '',
       distanceKm: json['distance'] != null ? (json['distance'] as num).toDouble() : 0.0,
       durationSeconds: json['duration'] != null ? (json['duration'] as num).toInt() : 0,

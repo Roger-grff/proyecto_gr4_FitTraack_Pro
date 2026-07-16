@@ -66,11 +66,10 @@ void main() {
       // 7. type validation
       expect(map['type'], equals('running'));
       
-      final walkingMap = session.toBackendMap(type: 'WALKING');
+      final walkingMap = session.toBackendMap(type: 'walking');
       expect(walkingMap['type'], equals('walking'));
       
-      final unknownMap = session.toBackendMap(type: 'flying');
-      expect(unknownMap['type'], equals('running')); // Default fallback
+      expect(() => session.toBackendMap(type: 'flying'), throwsArgumentError);
 
       // 8. weather can be null
       expect(map.containsKey('weather'), isTrue);

@@ -2,10 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:proyecto_gr4/core/theme/app_theme.dart';
 import 'package:proyecto_gr4/features/tracking/data/tracking_repository.dart';
-import 'package:proyecto_gr4/features/tracking/domain/activity_session.dart';
 import 'package:proyecto_gr4/features/tracking/presentation/controllers/tracking_controller.dart';
 import 'package:proyecto_gr4/features/tracking/presentation/controllers/tracking_state.dart';
-import 'package:intl/intl.dart';
 import 'package:proyecto_gr4/features/tracking/presentation/controllers/activities_controller.dart';
 import 'package:proyecto_gr4/features/tracking/presentation/screens/activity_detail_screen.dart';
 import 'package:proyecto_gr4/features/tracking/presentation/widgets/backend_activity_card.dart';
@@ -510,29 +508,8 @@ class HomeScreen extends ConsumerWidget {
               );
             },
           ),
+        );
       },
-    );
-  }
-
-  Widget _buildMiniStat(ThemeData theme, String label, String value) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: theme.textTheme.bodySmall?.copyWith(
-            fontSize: 10,
-            color: theme.colorScheme.onSurface.withOpacity(0.4),
-          ),
-        ),
-        Text(
-          value,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-            fontSize: 13,
-          ),
-        ),
-      ],
     );
   }
 }

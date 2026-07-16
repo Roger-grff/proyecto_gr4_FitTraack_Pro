@@ -9,9 +9,9 @@ import 'package:proyecto_gr4/features/tracking/domain/location_point.dart';
 import 'package:proyecto_gr4/features/tracking/data/activity_service.dart';
 import 'package:proyecto_gr4/features/tracking/data/activity_service_provider.dart';
 import 'package:proyecto_gr4/features/tracking/domain/finish_activity_result.dart';
+import 'package:proyecto_gr4/features/tracking/domain/activity_type.dart';
 import 'package:proyecto_gr4/core/errors/api_exception.dart';
 import 'timer_controller.dart';
-import 'tracking_state.dart';
 
 class _PendingActivitySave {
   final ActivitySession session;
@@ -135,8 +135,8 @@ class TrackingNotifier extends Notifier<TrackingState> {
     String normalizedTitle = title.trim();
     if (normalizedTitle.isEmpty) normalizedTitle = 'Actividad deportiva';
     
-    if (type != 'running' && type != 'walking') {
-      throw ArgumentError('El tipo de actividad solo puede ser "running" o "walking"');
+    if (ActivityType.tryFromApiValue(type) == null) {
+      throw ArgumentError('Invalid activity type: $type');
     }
 
     _unsubscribeFromLocation();
