@@ -144,7 +144,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                               name: user.name.isNotEmpty ? user.name : 'C',
                             ),
                             if (_isUploadingPhoto)
-                              const Positioned.fill(
+                              Positioned.fill(
                                 child: Container(
                                   decoration: BoxDecoration(color: Colors.black45, shape: BoxShape.circle),
                                   child: Center(child: CircularProgressIndicator(color: Colors.white)),
