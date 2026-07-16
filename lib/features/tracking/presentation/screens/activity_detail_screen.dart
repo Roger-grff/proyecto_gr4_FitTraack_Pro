@@ -10,8 +10,7 @@ import 'package:proyecto_gr4/features/tracking/presentation/utils/activity_type_
 import 'package:proyecto_gr4/features/tracking/presentation/screens/edit_activity_screen.dart';
 import 'package:proyecto_gr4/features/tracking/data/models/backend_track_point.dart';
 import 'package:proyecto_gr4/features/tracking/presentation/controllers/activity_detail_controller.dart';
-import 'package:proyecto_gr4/features/tracking/data/models/backend_track_point.dart';
-import 'package:proyecto_gr4/features/tracking/presentation/controllers/activity_detail_controller.dart';
+import 'package:proyecto_gr4/features/stats/presentation/controllers/stats_controller.dart';
 
 import 'package:proyecto_gr4/features/tracking/data/activity_service_provider.dart';
 import 'package:proyecto_gr4/features/tracking/presentation/controllers/activities_controller.dart';
@@ -51,6 +50,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
 
     if (result == true && mounted) {
       ref.invalidate(activitiesProvider);
+      ref.invalidate(statsProvider);
       ref.invalidate(activityDetailProvider(widget.activityId));
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Actividad actualizada correctamente.')),
@@ -67,6 +67,7 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
       await ref.read(activityServiceProvider).deleteActivity(widget.activityId);
       
       ref.invalidate(activitiesProvider);
+      ref.invalidate(statsProvider);
       ref.invalidate(activityDetailProvider(widget.activityId));
       
       if (!mounted) return;
@@ -81,7 +82,8 @@ class _ActivityDetailScreenState extends ConsumerState<ActivityDetailScreen> {
         msg = 'No tienes permiso para eliminar esta actividad.';
       } else if (e.statusCode == 404) {
         msg = 'La actividad ya no existe.';
-        ref.invalidate(activitiesProvider); // Invalidar localmente para que no aparezca
+        ref.invalidate(activitiesProvider);
+        ref.invalidate(statsProvider);
       } else if (e.statusCode == 500) {
         msg = 'No se pudo eliminar la actividad en este momento.';
       }

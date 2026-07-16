@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:proyecto_gr4/core/errors/tracking_error.dart';
 import 'package:proyecto_gr4/features/tracking/presentation/controllers/activities_controller.dart';
+import 'package:proyecto_gr4/features/stats/presentation/controllers/stats_controller.dart';
 import 'package:proyecto_gr4/features/tracking/presentation/controllers/tracking_state.dart';
 import 'package:proyecto_gr4/features/tracking/data/tracking_repository.dart';
 import 'package:proyecto_gr4/features/tracking/domain/activity_session.dart';
@@ -183,6 +184,7 @@ class TrackingNotifier extends Notifier<TrackingState> {
       
       // Invalidar el proveedor de red para que el historial se recargue al volver
       ref.invalidate(activitiesProvider);
+      ref.invalidate(statsProvider);
 
       state = state.copyWith(
         status: TrackingStatus.finished,

@@ -1,6 +1,7 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:proyecto_gr4/features/auth/data/auth_repository.dart';
+import 'package:proyecto_gr4/features/auth/domain/app_user.dart';
 import 'auth_state.dart';
 
 class AuthNotifier extends Notifier<AuthState> {
@@ -153,6 +154,13 @@ class AuthNotifier extends Notifier<AuthState> {
   /// Clear current error message
   void clearError() {
     state = state.copyWith(clearError: true);
+  }
+
+  /// Update current user (used when editing profile)
+  void updateUser(AppUser newUser) {
+    if (state.status == AuthStatus.authenticated) {
+      state = state.copyWith(user: newUser);
+    }
   }
 }
 

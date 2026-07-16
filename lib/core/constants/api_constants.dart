@@ -9,5 +9,6 @@ class ApiConstants {
 
   static const activities = "$baseUrl/api/activities";
   static const usersMe = "$baseUrl/api/users/me";
+  static const usersMePhoto = "$baseUrl/api/users/me/photo";
   static const statsMe = "$baseUrl/api/stats/me";
 }

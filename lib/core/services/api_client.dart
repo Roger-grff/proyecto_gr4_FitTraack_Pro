@@ -75,6 +75,61 @@ class ApiClient {
     );
   }
 
+  Future<dynamic> postMultipart(
+    String url, {
+    required String filePath,
+    required String fileField,
+    bool authenticated = true,
+    Map<String, String>? fields,
+  }) async {
+    final file = File(filePath);
+    if (!await file.exists()) {
+      throw const ApiException(message: 'El archivo no existe.');
+    }
+    
+    final length = await file.length();
+    if (length > 5 * 1024 * 1024) {
+      throw const ApiException(message: 'El archivo supera los 5 MB permitidos.', statusCode: 413);
+    }
+
+    final request = http.MultipartRequest('POST', Uri.parse(url));
+    request.headers['Accept'] = 'application/json';
+
+    if (authenticated) {
+      final token = await tokenReader();
+      if (token == null || token.isEmpty) {
+        throw const ApiException(
+          message: 'No existe una sesión válida.',
+          statusCode: 401,
+        );
+      }
+      request.headers['Authorization'] = 'Bearer $token';
+    }
+
+    if (fields != null) {
+      request.fields.addAll(fields);
+    }
+
+    request.files.add(await http.MultipartFile.fromPath(fileField, filePath));
+
+    try {
+      final streamedResponse = await client.send(request).timeout(timeout);
+      final response = await http.Response.fromStream(streamedResponse);
+      return _handleResponse(response);
+    } on TimeoutException {
+      throw const ApiException(message: 'Tiempo de espera agotado.');
+    } on SocketException {
+      throw const ApiException(message: 'No se pudo conectar con el servidor.');
+    } on http.ClientException {
+      throw const ApiException(message: 'Error de conexión con el servidor.');
+    } on FormatException {
+      throw const ApiException(message: 'El servidor devolvió una respuesta inválida.');
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException(message: 'Error inesperado: ${e.toString()}');
+    }
+  }
+
   Future<dynamic> _sendRequest({
     required String method,
     required String url,
